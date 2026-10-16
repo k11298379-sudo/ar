@@ -125,12 +125,7 @@
       max-height: 28vh;
       object-fit: contain;
       filter: drop-shadow(0 0 35px rgba(0, 255, 162, 0.7));
-      animation: pulseGlow 3s ease-in-out infinite alternate;
       z-index: 2;
-    }
-    @keyframes pulseGlow {
-      from { filter: drop-shadow(0 0 25px rgba(0, 255, 162, 0.5)); transform: scale(0.98); }
-      to   { filter: drop-shadow(0 0 45px rgba(0, 255, 162, 0.85)); transform: scale(1.01); }
     }
 
     /* Дорога из жёлтого кирпича с перспективой */
@@ -166,7 +161,7 @@
       height: clamp(18px, 3.2vw, 28px);
     }
 
-    /* Мистический ураган в левой части */
+    /* Статичный ураган в левой части афиши */
     .tornado-vortex-art {
       position: absolute;
       left: 6%;
@@ -174,86 +169,61 @@
       width: clamp(70px, 14vw, 130px);
       opacity: 0.88;
       filter: drop-shadow(0 0 18px rgba(180, 120, 255, 0.6));
-      animation: floatTornado 3s ease-in-out infinite;
       z-index: 3;
     }
-    @keyframes floatTornado {
-      0%, 100% { transform: translateY(0) rotate(-3deg); }
-      50%      { transform: translateY(-8px) rotate(3deg); }
-    }
 
-    /* ── НИЖНЯЯ ЧАСТЬ: ИНТЕРАКТИВНЫЙ БЛОК AR И QR-КОД ── */
-    .ar-interactive-box {
+    /* ── НИЖНЯЯ ЧАСТЬ АФИШИ: ТИТРЫ И МИНИМАЛИСТИЧНЫЙ QR-КОД ── */
+    .poster-footer {
       position: relative;
       z-index: 6;
-      background: rgba(3, 20, 13, 0.92);
-      border: 2px solid #00ffa2;
-      box-shadow: 0 0 30px rgba(0, 255, 162, 0.35);
-      border-radius: 16px;
-      padding: 14px 18px;
       display: flex;
-      align-items: center;
-      gap: 16px;
-      backdrop-filter: blur(10px);
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 10px 16px 2px 16px;
+      background: linear-gradient(180deg, transparent 0%, rgba(1, 17, 10, 0.8) 100%);
+    }
+    .footer-credits {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      text-align: left;
+    }
+    .credits-tag {
+      font-size: clamp(12px, 2.2vw, 16px);
+      font-weight: 800;
+      color: #ffd53d;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: 0 1px 6px #000;
+    }
+    .credits-sub {
+      font-size: clamp(9px, 1.4vw, 11px);
+      color: #88d5b5;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
     }
     .qr-frame {
       background: #ffffff;
-      padding: 8px;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+      padding: 6px;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
+      gap: 3px;
       flex-shrink: 0;
     }
     #qrcode-canvas {
-      width: clamp(96px, 16vw, 128px);
-      height: clamp(96px, 16vw, 128px);
+      width: clamp(80px, 14vw, 100px);
+      height: clamp(80px, 14vw, 100px);
       display: block;
     }
-    .ar-instructions {
-      flex: 1;
-      min-width: 0;
-    }
-    .ar-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(0, 255, 162, 0.2);
-      border: 1px solid #00ffa2;
-      color: #d1fae5;
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-    }
-    .ar-inst-title {
-      font-size: clamp(14px, 2.2vw, 18px);
-      color: #ffd53d;
-      font-weight: 800;
-      line-height: 1.2;
-      margin-bottom: 4px;
-      text-shadow: 0 1px 4px #000;
-    }
-    .ar-steps {
-      font-size: clamp(10px, 1.6vw, 12.5px);
-      color: #e2e8f0;
-      line-height: 1.4;
-    }
-    .ar-steps b {
-      color: #6ee7b7;
-    }
-    .ar-url-link {
-      display: block;
-      margin-top: 5px;
-      font-size: clamp(10px, 1.5vw, 12px);
-      color: #fde047;
-      text-decoration: none;
-      word-break: break-all;
-      font-weight: 600;
+    .qr-badge-caption {
+      font-size: 9px;
+      font-weight: 900;
+      color: #022416;
+      letter-spacing: 1.5px;
+      line-height: 1;
     }
 
     /* ── СТИЛИ ДЛЯ ПЕЧАТИ (A4) ── */
@@ -325,21 +295,15 @@
       </div>
     </div>
 
-    <!-- НИЗ: ИНТЕРАКТИВНЫЙ БЛОК AR С QR-КОДОМ ДЛЯ СКАНИРОВАНИЯ -->
-    <div class="ar-interactive-box">
-      <div class="qr-frame">
-        <div id="qrcode-canvas"></div>
+    <!-- НИЗ АФИШИ: ТИТРЫ И QR-КОД -->
+    <div class="poster-footer">
+      <div class="footer-credits">
+        <div class="credits-tag">СКОРО В КИНОТЕАТРАХ</div>
+        <div class="credits-sub">СЕМЕЙНЫЙ ФИЛЬМ-СКАЗКА • 6+</div>
       </div>
-      <div class="ar-instructions">
-        <div class="ar-badge">✨ Оживающая AR-афиша</div>
-        <div class="ar-inst-title">Оживите постер прямо в комнате!</div>
-        <div class="ar-steps">
-          1. <b>Наведите камеру смартфона</b> на QR-код и откройте ссылку.<br>
-          2. Разрешите доступ к камере (<b>HTTPS</b>).<br>
-          3. <b>Наведите телефон на эту афишу</b> — из неё вырвется 3D-ураган!<br>
-          4. <b>Смахните ураган 3 раза</b> — домик Элли упадёт на дом ведьмы!
-        </div>
-        <a id="poster-phone-link" class="ar-url-link" href="#" target="_blank">Загрузка адреса...</a>
+      <div class="qr-frame" title="Сканируйте для просмотра в AR">
+        <div id="qrcode-canvas"></div>
+        <span class="qr-badge-caption">AR ПОСТЕР</span>
       </div>
     </div>
   </main>
