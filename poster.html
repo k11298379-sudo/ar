@@ -353,10 +353,18 @@
         <span>⛶</span>
         <span>Во весь экран</span>
       </button>
-      <a class="btn btn-secondary" href="/" target="_blank">
+      <a class="btn btn-secondary" href="index.html" target="_blank">
         <span>🚀</span>
-        <span>Открыть AR в браузере</span>
+        <span>Открыть AR</span>
       </a>
+    </div>
+
+    <!-- Редактор ссылки для QR-кода на афише -->
+    <div style="width:100%; display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.12);">
+      <span style="font-size:12px; color:#88d5b5; white-space:nowrap;">🌐 Ссылка в QR-коде афиши:</span>
+      <input id="custom-qr-input" type="text" placeholder="https://ваш-сайт.com" style="flex:1; min-width:200px; background:rgba(0,0,0,0.55); border:1px solid #00ffa2; color:#ffd53d; padding:6px 12px; border-radius:10px; font-size:12px; font-family:monospace; outline:none;" />
+      <button class="btn" style="padding:6px 14px; font-size:11px;" onclick="applyCustomQrUrl()">Применить ссылку к QR</button>
+      <button class="btn btn-secondary" style="padding:6px 12px; font-size:11px;" onclick="resetAutoQrUrl()">Авто (текущий сайт)</button>
     </div>
   </header>
 
@@ -469,31 +477,56 @@
       qrContainer.appendChild(img);
     }
 
-    // Автоматическое определение адреса:
-    // Если постер открыт на настоящем сайте (GitHub Pages, Vercel, Netlify, Cloudflare) — берём реальный публичный адрес!
-    if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && !location.hostname.startsWith('192.168.')) {
-      const siteUrl = window.location.origin + window.location.pathname.replace(/poster\.html$/i, '');
-      renderQR(siteUrl);
-    } else {
-      // Локальный режим разработчика
-      fetch('/api/info')
-        .then(r => r.json())
-        .then(data => {
-          if (data && (data.public_url || data.phone_url)) {
-            renderQR(data.public_url || data.phone_url);
-          } else {
-            fallbackQR();
-          }
-        })
-        .catch(() => {
-          fallbackQR();
-        });
+    const customInput = document.getElementById('custom-qr-input');
+
+    function applyCustomQrUrl() {
+      if (!customInput) return;
+      const val = customInput.value.trim();
+      if (!val) return;
+      localStorage.setItem('custom_ar_url', val);
+      renderQR(val);
     }
 
-    function fallbackQR() {
+    function resetAutoQrUrl() {
+      localStorage.removeItem('custom_ar_url');
+      detectAndRenderAutoQR();
+    }
+
+    function detectAndRenderAutoQR() {
+      // Если постер открыт на сайте в интернете — берём реальный адрес сайта!
+      if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && !location.hostname.startsWith('192.168.')) {
+        const siteUrl = window.location.origin + window.location.pathname.replace(/poster\.html$/i, '');
+        if (customInput) customInput.value = siteUrl;
+        renderQR(siteUrl);
+      } else {
+        // Локальный режим разработчика
+        fetch('/api/info')
+          .then(r => r.json())
+          .then(data => {
+            const url = (data && (data.public_url || data.phone_url)) ? (data.public_url || data.phone_url) : getFallbackUrl();
+            if (customInput) customInput.value = url;
+            renderQR(url);
+          })
+          .catch(() => {
+            const fb = getFallbackUrl();
+            if (customInput) customInput.value = fb;
+            renderQR(fb);
+          });
+      }
+    }
+
+    function getFallbackUrl() {
       const host = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? '192.168.0.100' : location.hostname;
-      const url = `https://${host}:8443`;
-      renderQR(url);
+      return `https://${host}:8443`;
+    }
+
+    // Инициализация при открытии:
+    const savedUrl = localStorage.getItem('custom_ar_url');
+    if (savedUrl) {
+      if (customInput) customInput.value = savedUrl;
+      renderQR(savedUrl);
+    } else {
+      detectAndRenderAutoQR();
     }
   </script>
 </body>
