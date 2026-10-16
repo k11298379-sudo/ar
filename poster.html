@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Афиша фильма — «Волшебник Изумрудного Города» (AR)</title>
+  <script src="assets/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #060e0a;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cinzel", serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      overflow-x: hidden;
+    }
+
+    /* Верхняя плашка управления (скрывается при печати) */
+    .controls-bar {
+      width: 100%;
+      max-width: 820px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      background: rgba(4, 28, 18, 0.85);
+      border: 1px solid rgba(0, 255, 162, 0.35);
+      border-radius: 18px;
+      padding: 12px 20px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+    }
+    .controls-title {
+      font-size: 14px;
+      color: #6ee7b7;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: linear-gradient(135deg, #00ffa2, #00a86b);
+      border: none;
+      color: #022013;
+      padding: 9px 18px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      text-decoration: none;
+      box-shadow: 0 4px 15px rgba(0, 255, 162, 0.35);
+      transition: transform 0.18s, box-shadow 0.18s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 255, 162, 0.55);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* ════════════════════════════════════════════════
+       КИНОАФИША (А4 / КИНОТЕАТРАЛЬНЫЙ ПОСТЕР)
+       ════════════════════════════════════════════════ */
+    #poster-sheet {
+      width: min(94vw, 760px);
+      aspect-ratio: 1 / 1.48; /* Пропорции киноплаката ~2:3 */
+      background: radial-gradient(circle at 50% 30%, #064028 0%, #022215 55%, #01110a 100%);
+      border: 10px solid #d4af37;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        0 0 50px rgba(0, 255, 162, 0.25),
+        0 25px 60px rgba(0, 0, 0, 0.8),
+        inset 0 0 35px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 28px 24px;
+    }
+
+    /* Двойная золотая рамка постера с уголками */
+    .inner-border {
+      position: absolute;
+      inset: 8px;
+      border: 2px solid rgba(255, 213, 61, 0.65);
+      border-radius: 6px;
+      pointer-events: none;
+    }
+    .corner {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border: 3px solid #ffd53d;
+      pointer-events: none;
+    }
+    .tl { top: 14px; left: 14px; border-right: none; border-bottom: none; }
+    .tr { top: 14px; right: 14px; border-left: none; border-bottom: none; }
+    .bl { bottom: 14px; left: 14px; border-right: none; border-top: none; }
+    .br { bottom: 14px; right: 14px; border-left: none; border-top: none; }
+
+    /* Фоновые звёзды и вихревое свечение */
+    .bg-aura {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 20%, rgba(0, 255, 162, 0.18) 0%, transparent 60%),
+        radial-gradient(circle at 20% 70%, rgba(255, 213, 61, 0.12) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* ── ВЕРХНЯЯ ЧАСТЬ: ТИТРЫ И ЗАГОЛОВОК ── */
+    .poster-header {
+      position: relative;
+      z-index: 5;
+      text-align: center;
+    }
+    .tagline-top {
+      font-size: clamp(10px, 1.8vw, 13px);
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      color: #6ee7b7;
+      font-weight: 600;
+      margin-bottom: 6px;
+      text-shadow: 0 0 10px rgba(0, 255, 162, 0.6);
+    }
+    .main-title {
+      font-size: clamp(26px, 5.2vw, 46px);
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      line-height: 1.1;
+      background: linear-gradient(180deg, #fffdf0 0%, #ffd700 50%, #b8860b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 4px 14px rgba(0, 255, 140, 0.5));
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: clamp(12px, 2.4vw, 18px);
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: #fed7aa;
+      font-weight: 600;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    }
+
+    /* ── ЦЕНТРАЛЬНАЯ ЧАСТЬ: ИЗУМРУДНЫЙ ГОРОД И УРАГАН ── */
+    .poster-art-area {
+      position: relative;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      z-index: 3;
+      margin: 10px 0;
+    }
+    .city-graphic {
+      width: 78%;
+      max-height: 28vh;
+      object-fit: contain;
+      filter: drop-shadow(0 0 35px rgba(0, 255, 162, 0.7));
+      animation: pulseGlow 3s ease-in-out infinite alternate;
+      z-index: 2;
+    }
+    @keyframes pulseGlow {
+      from { filter: drop-shadow(0 0 25px rgba(0, 255, 162, 0.5)); transform: scale(0.98); }
+      to   { filter: drop-shadow(0 0 45px rgba(0, 255, 162, 0.85)); transform: scale(1.01); }
+    }
+
+    /* Дорога из жёлтого кирпича с перспективой */
+    .road-graphic {
+      position: absolute;
+      bottom: 0;
+      left: 10%;
+      right: 10%;
+      width: 80%;
+      height: 16vh;
+      object-fit: fill;
+      filter: drop-shadow(0 0 20px rgba(255, 213, 61, 0.45));
+      z-index: 1;
+      opacity: 0.95;
+    }
+
+    /* Силуэты героев на дороге */
+    .heroes-silhouettes {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      z-index: 4;
+    }
+    .heroes-silhouettes img {
+      height: clamp(34px, 5.5vw, 54px);
+      filter: drop-shadow(0 2px 6px #000);
+    }
+    .heroes-silhouettes img.toto {
+      height: clamp(18px, 3.2vw, 28px);
+    }
+
+    /* Мистический ураган в левой части */
+    .tornado-vortex-art {
+      position: absolute;
+      left: 6%;
+      top: 15%;
+      width: clamp(70px, 14vw, 130px);
+      opacity: 0.88;
+      filter: drop-shadow(0 0 18px rgba(180, 120, 255, 0.6));
+      animation: floatTornado 3s ease-in-out infinite;
+      z-index: 3;
+    }
+    @keyframes floatTornado {
+      0%, 100% { transform: translateY(0) rotate(-3deg); }
+      50%      { transform: translateY(-8px) rotate(3deg); }
+    }
+
+    /* ── НИЖНЯЯ ЧАСТЬ: ИНТЕРАКТИВНЫЙ БЛОК AR И QR-КОД ── */
+    .ar-interactive-box {
+      position: relative;
+      z-index: 6;
+      background: rgba(3, 20, 13, 0.92);
+      border: 2px solid #00ffa2;
+      box-shadow: 0 0 30px rgba(0, 255, 162, 0.35);
+      border-radius: 16px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      backdrop-filter: blur(10px);
+    }
+    .qr-frame {
+      background: #ffffff;
+      padding: 8px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    #qrcode-canvas {
+      width: clamp(96px, 16vw, 128px);
+      height: clamp(96px, 16vw, 128px);
+      display: block;
+    }
+    .ar-instructions {
+      flex: 1;
+      min-width: 0;
+    }
+    .ar-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 255, 162, 0.2);
+      border: 1px solid #00ffa2;
+      color: #d1fae5;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .ar-inst-title {
+      font-size: clamp(14px, 2.2vw, 18px);
+      color: #ffd53d;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 4px;
+      text-shadow: 0 1px 4px #000;
+    }
+    .ar-steps {
+      font-size: clamp(10px, 1.6vw, 12.5px);
+      color: #e2e8f0;
+      line-height: 1.4;
+    }
+    .ar-steps b {
+      color: #6ee7b7;
+    }
+    .ar-url-link {
+      display: block;
+      margin-top: 5px;
+      font-size: clamp(10px, 1.5vw, 12px);
+      color: #fde047;
+      text-decoration: none;
+      word-break: break-all;
+      font-weight: 600;
+    }
+
+    /* ── СТИЛИ ДЛЯ ПЕЧАТИ (A4) ── */
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .controls-bar {
+        display: none !important;
+      }
+      #poster-sheet {
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        box-shadow: none;
+        border: 8px solid #c99718;
+        border-radius: 0;
+        page-break-after: avoid;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ВЕРХНЕЕ МЕНЮ (скрывается при печати) -->
+  <header class="controls-bar">
+    <div class="controls-title">
+      <span>🎬</span>
+      <span><b>Официальная AR-афиша фильма</b> для сканирования и печати</span>
+    </div>
+    <div class="btn-group">
+      <button class="btn" onclick="window.print()">
+        <span>🖨️</span>
+        <span>Распечатать афишу (A4)</span>
+      </button>
+      <button class="btn btn-secondary" onclick="toggleFullscreen()">
+        <span>⛶</span>
+        <span>Во весь экран</span>
+      </button>
+      <a class="btn btn-secondary" href="/" target="_blank">
+        <span>🚀</span>
+        <span>Открыть AR в браузере</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════════════
+       КИНОАФИША «ВОЛШЕБНИК ИЗУМРУДНОГО ГОРОДА»
+       ════════════════════════════════════════════════ -->
+  <main id="poster-sheet">
+    <div class="inner-border"></div>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="bg-aura"></div>
+
+    <!-- ВЕРХ: ТИТРЫ И НАЗВАНИЕ ФИЛЬМА -->
+    <div class="poster-header">
+      <div class="tagline-top">⭐ Скоро во всех кинотеатрах страны ⭐</div>
+      <h1 class="main-title">Волшебник<br>Изумрудного Города</h1>
+      <div class="subtitle">Дорога из жёлтого кирпича</div>
+    </div>
+
+    <!-- ЦЕНТР: АРТ ГОРОДА, ДОРОГИ, УРАГАНА И ГЕРОЕВ -->
+    <div class="poster-art-area">
+      <!-- 3D Ураган (символ Сцены 1) -->
+      <svg class="tornado-vortex-art" viewBox="0 0 100 140" fill="none">
+        <path d="M15 15 C 45 10, 85 10, 85 20 C 85 30, 20 30, 25 45 C 30 60, 80 60, 75 75 C 70 90, 30 90, 40 105 C 50 120, 60 125, 50 135" stroke="#a78bfa" stroke-width="8" stroke-linecap="round" opacity="0.85"/>
+        <path d="M25 22 C 55 18, 75 22, 65 35 C 55 48, 35 55, 60 70 C 65 85, 45 95, 48 115" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
+        <circle cx="50" cy="135" r="7" fill="#fbbf24"/>
+      </svg>
+
+      <!-- Изумрудный Замок -->
+      <img class="city-graphic" src="assets/emerald_city.svg" alt="Изумрудный Город" />
+
+      <!-- Дорога из кирпича -->
+      <img class="road-graphic" src="assets/road.svg" alt="Дорога из жёлтого кирпича" />
+
+      <!-- Силуэты шествия героев -->
+      <div class="heroes-silhouettes">
+        <img class="toto" src="assets/hero_toto.svg" alt="Тотошка" />
+        <img src="assets/hero_ellie.svg" alt="Элли" />
+        <img src="assets/hero_scarecrow.svg" alt="Страшила" />
+        <img src="assets/hero_woodman.svg" alt="Железный Дровосек" />
+        <img src="assets/hero_lion.svg" alt="Трусливый Лев" />
+      </div>
+    </div>
+
+    <!-- НИЗ: ИНТЕРАКТИВНЫЙ БЛОК AR С QR-КОДОМ ДЛЯ СКАНИРОВАНИЯ -->
+    <div class="ar-interactive-box">
+      <div class="qr-frame">
+        <div id="qrcode-canvas"></div>
+      </div>
+      <div class="ar-instructions">
+        <div class="ar-badge">✨ Оживающая AR-афиша</div>
+        <div class="ar-inst-title">Оживите постер прямо в комнате!</div>
+        <div class="ar-steps">
+          1. <b>Наведите камеру смартфона</b> на QR-код и откройте ссылку.<br>
+          2. Разрешите доступ к камере (<b>HTTPS</b>).<br>
+          3. <b>Наведите телефон на эту афишу</b> — из неё вырвется 3D-ураган!<br>
+          4. <b>Смахните ураган 3 раза</b> — домик Элли упадёт на дом ведьмы!
+        </div>
+        <a id="poster-phone-link" class="ar-url-link" href="#" target="_blank">Загрузка адреса...</a>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    const qrContainer = document.getElementById('qrcode-canvas');
+    const linkEl = document.getElementById('poster-phone-link');
+
+    function renderQR(targetUrl) {
+      if (!qrContainer) return;
+      qrContainer.innerHTML = '';
+
+      if (linkEl) {
+        linkEl.textContent = targetUrl;
+        linkEl.href = targetUrl;
+      }
+
+      // 1. Пробуем локальный офлайн-генератор qrcode.min.js
+      if (typeof QRCode !== 'undefined') {
+        try {
+          new QRCode(qrContainer, {
+            text: targetUrl,
+            width: 128,
+            height: 128,
+            colorDark: "#022416",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+          });
+          return;
+        } catch (e) {
+          console.warn('Local QRCode error, falling back to API:', e);
+        }
+      }
+
+      // 2. Фолбэк на онлайн генератор
+      const img = document.createElement('img');
+      img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(targetUrl)}`;
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.alt = 'QR Code';
+      qrContainer.appendChild(img);
+    }
+
+    // Автоматическое определение адреса:
+    // Если постер открыт на настоящем сайте (GitHub Pages, Vercel, Netlify, Cloudflare) — берём реальный публичный адрес!
+    if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && !location.hostname.startsWith('192.168.')) {
+      const siteUrl = window.location.origin + window.location.pathname.replace(/poster\.html$/i, '');
+      renderQR(siteUrl);
+    } else {
+      // Локальный режим разработчика
+      fetch('/api/info')
+        .then(r => r.json())
+        .then(data => {
+          if (data && (data.public_url || data.phone_url)) {
+            renderQR(data.public_url || data.phone_url);
+          } else {
+            fallbackQR();
+          }
+        })
+        .catch(() => {
+          fallbackQR();
+        });
+    }
+
+    function fallbackQR() {
+      const host = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? '192.168.0.100' : location.hostname;
+      const url = `https://${host}:8443`;
+      renderQR(url);
+    }
+  </script>
+</body>
+</html>

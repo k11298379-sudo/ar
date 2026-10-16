@@ -1,0 +1,7 @@
+cert.pem
+key.pem
+AR_Emerald_City.zip
+__pycache__/
+*.pyc
+.idea/
+.vscode/

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300" width="200" height="300">
+  <defs>
+    <radialGradient id="vortexGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#1a0030"/>
+      <stop offset="50%"  stop-color="#3d0060"/>
+      <stop offset="100%" stop-color="#0d0020"/>
+    </radialGradient>
+    <filter id="blur1">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+    <animateTransform id="spin"/>
+  </defs>
+
+  <!-- Glow background -->
+  <ellipse cx="100" cy="160" rx="80" ry="100" fill="rgba(100,0,200,0.15)" filter="url(#blur1)"/>
+
+  <!-- Spinning vortex group -->
+  <g transform="translate(100,160)">
+    <animateTransform attributeName="transform" type="rotate"
+      from="0 0 0" to="360 0 0"
+      dur="1.8s" repeatCount="indefinite" additive="sum"/>
+    <!-- Outer arms -->
+    <path d="M0,0 Q 60,-30 50,-80 Q 40,-120 0,-100 Q -30,-80 -20,-40 Z"
+      fill="#6600cc" opacity="0.9"/>
+    <path d="M0,0 Q -60,30 -50,80 Q -40,120 0,100 Q 30,80 20,40 Z"
+      fill="#7700dd" opacity="0.9"/>
+    <path d="M0,0 Q 30,60 80,50 Q 120,40 100,0 Q 80,-30 40,-20 Z"
+      fill="#5500bb" opacity="0.85"/>
+    <path d="M0,0 Q -30,-60 -80,-50 Q -120,-40 -100,0 Q -80,30 -40,20 Z"
+      fill="#8800ee" opacity="0.85"/>
+    <!-- Inner core -->
+    <circle r="22" fill="#cc00ff" opacity="0.95"/>
+    <circle r="12" fill="#ffffff" opacity="0.8"/>
+  </g>
+
+  <!-- Wind lines -->
+  <g stroke="#cc88ff" stroke-width="1.5" opacity="0.6" fill="none">
+    <path d="M 20,40 Q 60,30 80,50"><animate attributeName="d" values="M 20,40 Q 60,30 80,50;M 15,38 Q 65,25 85,48;M 20,40 Q 60,30 80,50" dur="0.9s" repeatCount="indefinite"/></path>
+    <path d="M 160,80 Q 130,90 110,110"><animate attributeName="d" values="M 160,80 Q 130,90 110,110;M 165,75 Q 125,95 105,115;M 160,80 Q 130,90 110,110" dur="1.1s" repeatCount="indefinite"/></path>
+    <path d="M 30,220 Q 70,210 100,230"><animate attributeName="d" values="M 30,220 Q 70,210 100,230;M 25,215 Q 75,205 105,228;M 30,220 Q 70,210 100,230" dur="0.8s" repeatCount="indefinite"/></path>
+    <path d="M 150,250 Q 120,240 100,260"><animate attributeName="d" values="M 150,250 Q 120,240 100,260;M 155,245 Q 115,245 95,262;M 150,250 Q 120,240 100,260" dur="1.0s" repeatCount="indefinite"/></path>
+  </g>
+
+  <!-- Debris particles -->
+  <g fill="#ffcc44" opacity="0.8">
+    <circle cx="70" cy="100" r="3"><animateMotion path="M0,0 Q30,-20 60,0 Q30,20 0,0" dur="1.2s" repeatCount="indefinite"/></circle>
+    <circle cx="130" cy="200" r="2.5"><animateMotion path="M0,0 Q-25,15 -50,0 Q-25,-15 0,0" dur="1.5s" repeatCount="indefinite"/></circle>
+    <rect x="0" y="0" width="8" height="4" rx="1"><animateMotion path="M90,130 Q120,110 150,130 Q120,150 90,130" dur="1.0s" repeatCount="indefinite"/></rect>
+  </g>
+
+  <!-- Label -->
+  <text x="100" y="285" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#cc88ff" font-weight="bold">🌪 УРАГАН</text>
+</svg>

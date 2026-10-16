@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="160" viewBox="0 0 80 160">
+  <defs>
+    <linearGradient id="metalBody" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"  stop-color="#8aabb0"/>
+      <stop offset="40%" stop-color="#ddeef0"/>
+      <stop offset="70%" stop-color="#aacccc"/>
+      <stop offset="100%" stop-color="#6a9a9f"/>
+    </linearGradient>
+    <linearGradient id="metalLeg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"  stop-color="#7a9ea3"/>
+      <stop offset="50%" stop-color="#c8e2e5"/>
+      <stop offset="100%" stop-color="#6a8e93"/>
+    </linearGradient>
+    <linearGradient id="metalHead" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"  stop-color="#88aaaf"/>
+      <stop offset="45%" stop-color="#e0f0f2"/>
+      <stop offset="100%" stop-color="#6a9aa0"/>
+    </linearGradient>
+  </defs>
+  <!-- Boots -->
+  <rect x="13" y="148" width="20" height="12" rx="4" fill="url(#metalLeg)"/>
+  <rect x="47" y="148" width="20" height="12" rx="4" fill="url(#metalLeg)"/>
+  <line x1="17" y1="151" x2="17" y2="157" stroke="white" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  <line x1="51" y1="151" x2="51" y2="157" stroke="white" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  <!-- Legs -->
+  <rect x="15" y="108" width="18" height="42" rx="5" fill="url(#metalLeg)"/>
+  <rect x="47" y="108" width="18" height="42" rx="5" fill="url(#metalLeg)"/>
+  <line x1="19" y1="112" x2="19" y2="145" stroke="white" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+  <line x1="53" y1="112" x2="53" y2="145" stroke="white" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+  <!-- Knee bolts -->
+  <circle cx="24" cy="125" r="4" fill="#6a9aa0"/>
+  <circle cx="24" cy="125" r="2" fill="#aacccc"/>
+  <circle cx="56" cy="125" r="4" fill="#6a9aa0"/>
+  <circle cx="56" cy="125" r="2" fill="#aacccc"/>
+  <!-- Body barrel -->
+  <rect x="16" y="60" width="48" height="52" rx="10" fill="url(#metalBody)"/>
+  <!-- Rivet lines -->
+  <g stroke="#6a9aa0" stroke-width="1" opacity="0.5">
+    <line x1="16" y1="75" x2="64" y2="75"/>
+    <line x1="16" y1="95" x2="64" y2="95"/>
+    <line x1="16" y1="110" x2="64" y2="110"/>
+  </g>
+  <!-- Rivets -->
+  <g fill="#5a8a90">
+    <circle cx="20" cy="75" r="2.5"/><circle cx="60" cy="75" r="2.5"/>
+    <circle cx="20" cy="95" r="2.5"/><circle cx="60" cy="95" r="2.5"/>
+    <circle cx="20" cy="110" r="2.5"/><circle cx="60" cy="110" r="2.5"/>
+  </g>
+  <!-- Body shine -->
+  <rect x="22" y="64" width="8" height="44" rx="4" fill="white" opacity="0.22"/>
+  <!-- Heart on chest -->
+  <g transform="translate(40,82)">
+    <path d="M0,3 C0,-4 -8,-8 -8,-2 C-8,3 0,10 0,10 C0,10 8,3 8,-2 C8,-8 0,-4 0,3 Z" fill="#cc2233" opacity="0.9"/>
+  </g>
+  <!-- Shoulder joints -->
+  <circle cx="16" cy="68" r="7" fill="#aacccc"/>
+  <circle cx="16" cy="68" r="4" fill="#c8e2e5"/>
+  <circle cx="64" cy="68" r="7" fill="#aacccc"/>
+  <circle cx="64" cy="68" r="4" fill="#c8e2e5"/>
+  <!-- Arms -->
+  <rect x="4" y="65" width="14" height="40" rx="6" fill="url(#metalLeg)"/>
+  <rect x="62" y="65" width="14" height="40" rx="6" fill="url(#metalLeg)"/>
+  <line x1="7" y1="68" x2="7" y2="100" stroke="white" stroke-width="1.5" opacity="0.35" stroke-linecap="round"/>
+  <line x1="65" y1="68" x2="65" y2="100" stroke="white" stroke-width="1.5" opacity="0.35" stroke-linecap="round"/>
+  <!-- Elbow joints -->
+  <circle cx="11" cy="83" r="4" fill="#8aabb0"/>
+  <circle cx="69" cy="83" r="4" fill="#8aabb0"/>
+  <!-- Hands -->
+  <ellipse cx="11" cy="107" rx="7" ry="8" fill="#aacccc"/>
+  <ellipse cx="69" cy="107" rx="7" ry="8" fill="#aacccc"/>
+  <!-- Axe -->
+  <rect x="70" y="90" width="4" height="30" rx="2" fill="#8b6030"/>
+  <polygon points="74,88 86,80 86,100 74,96" fill="#c0c0c0"/>
+  <polygon points="74,88 80,84 82,90 74,92" fill="#ddeeff"/>
+  <!-- Neck -->
+  <rect x="32" y="48" width="16" height="16" rx="4" fill="url(#metalLeg)"/>
+  <circle cx="32" cy="56" r="2.5" fill="#5a8a90"/>
+  <circle cx="48" cy="56" r="2.5" fill="#5a8a90"/>
+  <!-- Head (square tin) -->
+  <rect x="20" y="22" width="40" height="30" rx="6" fill="url(#metalHead)"/>
+  <rect x="25" y="25" width="8" height="24" rx="4" fill="white" opacity="0.2"/>
+  <!-- Head rivets -->
+  <g fill="#5a8a90">
+    <circle cx="24" cy="26" r="2"/><circle cx="56" cy="26" r="2"/>
+    <circle cx="24" cy="48" r="2"/><circle cx="56" cy="48" r="2"/>
+  </g>
+  <!-- Glowing eyes -->
+  <ellipse cx="33" cy="35" rx="5" ry="5" fill="#225533"/>
+  <ellipse cx="47" cy="35" rx="5" ry="5" fill="#225533"/>
+  <ellipse cx="33" cy="35" rx="3" ry="3" fill="#44ff88"/>
+  <ellipse cx="47" cy="35" rx="3" ry="3" fill="#44ff88"/>
+  <circle cx="34" cy="34" r="1.2" fill="#aaffcc"/>
+  <circle cx="48" cy="34" r="1.2" fill="#aaffcc"/>
+  <!-- Mouth lines -->
+  <g stroke="#5a8a90" stroke-width="1.5" stroke-linecap="round">
+    <line x1="30" y1="44" x2="50" y2="44"/>
+    <line x1="32" y1="47" x2="48" y2="47"/>
+  </g>
+  <!-- Nose knob -->
+  <ellipse cx="40" cy="40" rx="3" ry="2" fill="#8aabb0"/>
+  <ellipse cx="40" cy="40" rx="1.5" ry="1" fill="#c8e2e5"/>
+  <!-- Funnel hat -->
+  <polygon points="28,22 52,22 44,2 36,2" fill="url(#metalHead)"/>
+  <rect x="24" y="16" width="32" height="8" rx="3" fill="#aacccc"/>
+  <line x1="36" y1="4" x2="34" y2="20" stroke="white" stroke-width="1.5" opacity="0.3" stroke-linecap="round"/>
+  <!-- Ear pieces -->
+  <rect x="16" y="30" width="6" height="10" rx="3" fill="#8aabb0"/>
+  <rect x="58" y="30" width="6" height="10" rx="3" fill="#8aabb0"/>
+  <circle cx="19" cy="35" r="2.5" fill="#c8e2e5"/>
+  <circle cx="61" cy="35" r="2.5" fill="#c8e2e5"/>
+</svg>

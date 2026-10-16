@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Волшебник Изумрудного Города — AR</title>
+  <script src="assets/three.min.js"></script>
+  <script src="assets/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+
+    /* ── CAMERA ── */
+    #camera-video {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; z-index: 1;
+    }
+    #mock-bg {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(circle at 50% 40%, #12201a 0%, #060e0a 100%);
+    }
+    #mock-bg .grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,255,162,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,162,.04) 1px, transparent 1px);
+      background-size: 38px 38px;
+    }
+
+    /* ── AR STAGE ── */
+    #ar-stage {
+      position: fixed; inset: 0; z-index: 10;
+      pointer-events: none; overflow: hidden;
+    }
+
+    /* ── TOP HUD ── */
+    #hud-top {
+      position: fixed; top: env(safe-area-inset-top, 14px);
+      left: 16px; right: 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      z-index: 100; pointer-events: auto;
+    }
+    #stage-badge {
+      background: rgba(0,28,18,.75); border: 1px solid #00ffa2;
+      box-shadow: 0 0 14px rgba(0,255,162,.2); color: #d6fff2;
+      padding: 7px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
+      backdrop-filter: blur(8px); transition: all .4s ease;
+    }
+    .hud-btns { display: flex; gap: 8px; }
+    .hud-btn {
+      background: rgba(0,18,12,.7); border: 1px solid rgba(0,255,162,.35);
+      color: #fff; width: 38px; height: 38px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 16px; backdrop-filter: blur(6px);
+      transition: transform .18s, background .18s;
+    }
+    .hud-btn:active { transform: scale(.9); background: rgba(0,255,162,.3); }
+
+    /* ── FLASH OVERLAY ── */
+    #flash {
+      position: fixed; inset: 0; background: #00ffa2; opacity: 0;
+      pointer-events: none; z-index: 500;
+      transition: opacity .45s ease-out;
+    }
+
+    /* ══════════════════════════════════
+       SCENE 1: 3D AR HURRICANE & POSTER
+       ══════════════════════════════════ */
+    #scene1 {
+      position: absolute; inset: 0;
+      z-index: 20; pointer-events: auto; touch-action: none;
+      overflow: hidden;
+    }
+    #three-container {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 21; cursor: grab;
+    }
+    #three-container:active { cursor: grabbing; }
+
+    #swipe-trail {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 24;
+    }
+
+    #swipe-hud {
+      position: absolute; bottom: clamp(22px, 5vh, 44px);
+      left: 0; right: 0;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; z-index: 30; pointer-events: none;
+    }
+    #swipe-gems {
+      display: flex; gap: 14px; align-items: center;
+    }
+    .swipe-gem {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: rgba(10, 25, 20, 0.78);
+      border: 1.5px solid rgba(0, 255, 162, 0.35);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.3);
+      backdrop-filter: blur(8px);
+    }
+    .swipe-gem.active {
+      background: linear-gradient(135deg, rgba(0,255,162,0.9), rgba(0,180,120,0.95));
+      border-color: #ffffff;
+      box-shadow: 0 0 24px rgba(0, 255, 162, 0.9), inset 0 0 10px rgba(255,255,255,0.7);
+      transform: scale(1.18);
+    }
+    #swipe-hint {
+      background: rgba(8, 22, 16, 0.85);
+      border: 1px solid rgba(0, 255, 162, 0.45);
+      color: #e4fff5; padding: 10px 24px; border-radius: 24px;
+      font-size: 14px; font-weight: 600;
+      display: flex; align-items: center; gap: 10px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      animation: floatHint 2.2s ease-in-out infinite;
+      transition: all 0.3s ease;
+    }
+    @keyframes floatHint {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-4px); }
+    }
+
+    /* ══════════════════════════════════
+       SCENE 2 & 3: 3D PAN WORLD
+       ══════════════════════════════════ */
+    #world {
+      position: absolute; inset: 0; display: none;
+      perspective: 900px; overflow: hidden;
+    }
+    /* The virtual camera pan — rotated by JS */
+    #cam {
+      position: absolute; inset: 0;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    /* ── FRONT (0°): Emerald City ── */
+    #view-front {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      justify-content: flex-end; align-items: center;
+      backface-visibility: hidden;
+      transform: rotateY(0deg) translateZ(0);
+    }
+    #city-img {
+      width: 100%; max-height: 75vh;
+      object-fit: contain; object-position: bottom;
+      filter: drop-shadow(0 0 40px rgba(0,255,140,.45));
+      transform: translateY(80px) scale(.9); opacity: 0;
+      transition: transform 1.4s cubic-bezier(.16,1,.3,1), opacity .9s ease;
+      will-change: transform, opacity;
+    }
+    #city-img.visible { transform: translateY(0) scale(1); opacity: 1; }
+
+    /* ── BACK (180°): Yellow brick road + walking heroes ── */
+    #view-back {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      justify-content: flex-end; align-items: center;
+      backface-visibility: hidden;
+      /* Rotated 180° around Y so it's behind us */
+      transform: rotateY(180deg) translateZ(0);
+    }
+    #road-img {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      width: 100%; height: clamp(280px, 48vh, 520px);
+      object-fit: fill; object-position: bottom;
+      filter: drop-shadow(0 0 24px rgba(255,213,61,.35));
+      pointer-events: none;
+    }
+
+    /* Heroes group — walks along Yellow Brick Road from horizon down to camera */
+    #heroes {
+      position: absolute;
+      bottom: 0px;
+      left: 50%;
+      display: flex; align-items: flex-end; justify-content: center;
+      gap: clamp(4px, 1.8vw, 14px);
+      transform-origin: bottom center;
+      /* Initial far position at the horizon */
+      transform: translateX(-50%) translateY(-280px) scale(0.065);
+      opacity: 0;
+      will-change: transform, opacity, filter;
+      transition: none; /* animated via JS rAF */
+      pointer-events: none;
+    }
+
+    .hero {
+      object-fit: contain;
+      transform-origin: bottom center;
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,.65));
+      will-change: transform;
+    }
+    .hero-ellie     { height: 135px; }
+    .hero-toto      { height:  56px; }
+    .hero-scarecrow { height: 138px; }
+    .hero-woodman   { height: 136px; }
+    .hero-lion      { height: 135px; }
+
+    /* ── DEDICATED WALKING GAITS FOR EACH CHARACTER ── */
+    /* Ellie: energetic, cheerful girl's stride with foot bounce */
+    .hero-ellie.walking {
+      animation: walkEllie 0.62s ease-in-out infinite;
+    }
+    @keyframes walkEllie {
+      0%   { transform: rotate(-4.5deg) translateY(0px); }
+      25%  { transform: rotate(-1deg)   translateY(-10px); }
+      50%  { transform: rotate(4.5deg)  translateY(0px); }
+      75%  { transform: rotate(1deg)    translateY(-10px); }
+      100% { transform: rotate(-4.5deg) translateY(0px); }
+    }
+
+    /* Toto: fast, joyful puppy trot with bouncy tail */
+    .hero-toto.walking {
+      animation: walkToto 0.34s ease-in-out infinite;
+    }
+    @keyframes walkToto {
+      0%   { transform: rotate(-7deg) translateY(0px) scaleX(1); }
+      25%  { transform: rotate(-2deg) translateY(-12px) scaleX(1.08); }
+      50%  { transform: rotate(7deg)  translateY(0px) scaleX(1); }
+      75%  { transform: rotate(2deg)  translateY(-12px) scaleX(0.94); }
+      100% { transform: rotate(-7deg) translateY(0px) scaleX(1); }
+    }
+
+    /* Scarecrow: loose, floppy straw-man wobble */
+    .hero-scarecrow.walking {
+      animation: walkScarecrow 0.74s ease-in-out infinite;
+    }
+    @keyframes walkScarecrow {
+      0%   { transform: rotate(-8deg) translateY(0px) skewX(-4deg); }
+      25%  { transform: rotate(-2deg) translateY(-14px) skewX(3deg); }
+      50%  { transform: rotate(8deg)  translateY(0px) skewX(4deg); }
+      75%  { transform: rotate(2deg)  translateY(-14px) skewX(-3deg); }
+      100% { transform: rotate(-8deg) translateY(0px) skewX(-4deg); }
+    }
+
+    /* Tin Woodman: stiff, robotic, clanking cadence */
+    .hero-woodman.walking {
+      animation: walkWoodman 0.68s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes walkWoodman {
+      0%   { transform: rotate(-3.5deg) translateY(0px); }
+      25%  { transform: rotate(-1deg)   translateY(-7px); }
+      50%  { transform: rotate(3.5deg)  translateY(0px); }
+      75%  { transform: rotate(1deg)    translateY(-7px); }
+      100% { transform: rotate(-3.5deg) translateY(0px); }
+    }
+
+    /* Cowardly Lion: heavy swaggering prowl */
+    .hero-lion.walking {
+      animation: walkLion 0.82s ease-in-out infinite;
+    }
+    @keyframes walkLion {
+      0%   { transform: rotate(-4.5deg) translateY(0px) scaleY(0.95); }
+      25%  { transform: rotate(-1deg)   translateY(-11px) scaleY(1.03); }
+      50%  { transform: rotate(4.5deg)  translateY(0px) scaleY(0.95); }
+      75%  { transform: rotate(1deg)    translateY(-11px) scaleY(1.03); }
+      100% { transform: rotate(-4.5deg) translateY(0px) scaleY(0.95); }
+    }
+
+    /* Idle subtle breathing when stopped */
+    .hero:not(.walking) {
+      animation: idleBreathe 2s ease-in-out infinite alternate;
+    }
+    @keyframes idleBreathe {
+      from { transform: translateY(0) scale(1); }
+      to   { transform: translateY(-3px) scale(1.01); }
+    }
+
+    /* Speech bubble on heroes */
+    #bubble {
+      position: absolute; top: -40px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,28,18,.88); border: 1px solid #00ffa2;
+      color: #a7ffeb; padding: 5px 13px; border-radius: 12px;
+      font-size: 11px; white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(0,255,162,.3);
+      pointer-events: none; opacity: 0;
+      transition: opacity .6s ease;
+    }
+    #bubble::after {
+      content: ''; position: absolute; bottom: -6px; left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: rgba(0,28,18,.88);
+    }
+
+    /* Scene 3: heroes on city side */
+    #scene3-heroes {
+      position: absolute; bottom: 8px; left: 50%;
+      transform: translateX(-50%);
+      display: none; flex-direction: row;
+      align-items: flex-end; justify-content: center;
+      gap: clamp(4px,1.8vw,14px);
+      transform-origin: bottom center;
+      will-change: transform, opacity;
+      transition: transform 4.2s cubic-bezier(.2,.8,.4,1), opacity 3.5s ease;
+    }
+    #scene3-heroes.walk-in {
+      transform: translateX(-50%) scale(.3) translateY(-90px);
+      opacity: .25;
+    }
+
+    .hero-s3 {
+      object-fit: contain;
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,.6));
+    }
+    .hero-s3.hero-ellie     { height: 120px; }
+    .hero-s3.hero-toto      { height:  52px; }
+    .hero-s3.hero-scarecrow { height: 120px; }
+    .hero-s3.hero-woodman   { height: 120px; }
+    .hero-s3.hero-lion      { height: 120px; }
+
+    /* AR badge bottom right */
+    #ar-badge {
+      position: fixed; bottom: 10px; right: 14px;
+      background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.15);
+      border-radius: 10px; padding: 3px 9px;
+      font-size: 10px; color: rgba(255,255,255,.5);
+      z-index: 100; pointer-events: none;
+    }
+
+    #mock-bg.hidden {
+      display: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    /* ── AR MODALS (CAMERA GATE & HTTPS NOTICES) ── */
+    .ar-modal {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(3, 12, 8, 0.88);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 18px; pointer-events: auto;
+      animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .ar-modal-card {
+      background: radial-gradient(circle at 50% 15%, rgba(0, 48, 30, 0.98), rgba(2, 18, 12, 0.98));
+      border: 1.5px solid #00ffa2;
+      box-shadow: 0 0 32px rgba(0, 255, 162, 0.35), inset 0 0 20px rgba(0, 255, 162, 0.08);
+      border-radius: 26px;
+      padding: 26px 22px;
+      max-width: 370px; width: 100%;
+      text-align: center; color: #fff;
+    }
+    .ar-modal-icon {
+      font-size: 42px; margin-bottom: 10px;
+      filter: drop-shadow(0 0 16px rgba(0, 255, 162, 0.6));
+    }
+    .ar-modal-title {
+      font-size: 19px; font-weight: 700; color: #00ffa2;
+      margin-bottom: 8px; line-height: 1.3;
+      text-shadow: 0 0 10px rgba(0, 255, 162, 0.35);
+    }
+    .ar-modal-desc {
+      font-size: 13px; line-height: 1.5; color: #c5ecd8;
+      margin-bottom: 18px;
+    }
+    .ar-modal-desc code {
+      background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 4px;
+      color: #ffd53d; font-family: monospace;
+    }
+    .ar-btn-primary {
+      width: 100%; padding: 13px 18px;
+      background: linear-gradient(135deg, #00ffa2, #00b374);
+      border: none; border-radius: 20px;
+      color: #022013; font-weight: 700; font-size: 15px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 4px 18px rgba(0, 255, 162, 0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .ar-btn-primary:active { transform: scale(0.97); }
+    .ar-btn-secondary {
+      width: 100%; padding: 10px 16px; margin-top: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 18px; color: #a0d8be; font-size: 12.5px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .ar-btn-secondary:active { background: rgba(255, 255, 255, 0.16); }
+    .ar-help-box {
+      margin-top: 14px; padding: 11px 13px;
+      background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(0, 255, 162, 0.22);
+      border-radius: 13px; text-align: left; font-size: 11.5px; color: #9fd7be; line-height: 1.45;
+    }
+    .ar-help-box b { color: #ffd53d; }
+    .ar-status-error {
+      margin-top: 12px; padding: 10px 12px;
+      background: rgba(255, 50, 70, 0.18); border: 1px solid rgba(255, 77, 109, 0.5);
+      border-radius: 12px; color: #ffb8c6; font-size: 12px; line-height: 1.4;
+      display: none; text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CAMERA -->
+  <video id="camera-video" autoplay playsinline muted></video>
+  <div id="mock-bg"><div class="grid"></div></div>
+
+  <div id="ar-stage">
+
+    <!-- HUD -->
+    <header id="hud-top">
+      <div id="stage-badge">🌪 Сцена 1 — Ураган</div>
+      <div class="hud-btns">
+        <button id="btn-poster" class="hud-btn" title="Афиша фильма (открыть/распечатать)">🖼️</button>
+        <button id="btn-phone"  class="hud-btn" title="Ссылка и QR-код для телефона">📱</button>
+        <button id="btn-cam"    class="hud-btn" title="Камера">📷</button>
+        <button id="btn-sound"  class="hud-btn" title="Звук">🔊</button>
+        <button id="btn-reset"  class="hud-btn" title="Сначала">🔄</button>
+      </div>
+    </header>
+
+    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ПОДКЛЮЧЕНИЯ С ТЕЛЕФОНА И ССЫЛКИ НА САЙТ -->
+    <div id="phone-modal" style="display:none; position:fixed; inset:0; z-index:900; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); align-items:center; justify-content:center; pointer-events:auto;">
+      <div style="background:rgba(5,25,18,0.96); border:1px solid #00ffa2; box-shadow:0 0 35px rgba(0,255,162,0.3); border-radius:24px; padding:24px; max-width:360px; width:92%; text-align:center; color:#fff;">
+        <h3 style="color:#00ffa2; margin-bottom:6px; font-size:18px;">📱 Открыть AR на смартфоне</h3>
+        <p style="font-size:12px; color:#c0eed8; margin-bottom:12px;">Отсканируйте QR-код камерой телефона или отправьте ссылку</p>
+        <div style="background:#fff; padding:10px; border-radius:16px; display:inline-block; margin-bottom:12px; box-shadow:0 4px 15px rgba(0,0,0,0.5);">
+          <div id="modal-qr-container" style="width:160px; height:160px; display:flex; align-items:center; justify-content:center;">
+            <img id="modal-qr-img" src="" alt="QR-код" style="width:160px; height:160px; display:block;" />
+          </div>
+        </div>
+        <div style="background:rgba(0,0,0,0.55); border:1px solid rgba(0,255,162,0.35); border-radius:12px; padding:10px; margin-bottom:10px; display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size:11px; color:#88d5b5;">Ссылка на сайт:</div>
+          <a id="modal-phone-link" href="#" target="_blank" style="color:#ffd53d; font-weight:bold; font-size:14px; text-decoration:none; word-break:break-all;">Загрузка...</a>
+          <button id="btn-copy-url" style="background:rgba(0,255,162,0.2); border:1px solid #00ffa2; color:#6ee7b7; border-radius:10px; padding:6px 12px; font-size:11.5px; font-weight:bold; cursor:pointer;">📋 Скопировать ссылку</button>
+        </div>
+        <a href="poster.html" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; width:100%; background:rgba(0,255,162,0.14); border:1px solid #00ffa2; color:#6ee7b7; padding:9px 12px; border-radius:14px; text-decoration:none; font-size:12px; font-weight:bold; margin-bottom:12px; box-sizing:border-box;">
+          <span>🖼️</span> <span>Открыть афишу фильма для печати</span>
+        </a>
+        <div style="font-size:11.5px; color:#a3e4c7; text-align:left; background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:10px; margin-bottom:14px; line-height:1.4;">
+          1. Откройте сайт на смартфоне.<br>
+          2. Нажмите <b>«Разрешить камеру»</b>.<br>
+          3. Наведите камеру телефона на афишу — и начнется магия AR!
+        </div>
+        <button id="btn-close-modal" style="background:linear-gradient(135deg, #00ffa2, #00a86b); border:none; color:#012415; font-weight:bold; padding:10px 28px; border-radius:20px; cursor:pointer; font-size:14px; box-shadow:0 4px 15px rgba(0,255,162,0.4);">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- HTTPS REQUIRED MODAL (показывается, если на телефоне открыли через http://) -->
+    <div id="https-modal" class="ar-modal" style="display:none;">
+      <div class="ar-modal-card">
+        <div class="ar-modal-icon">🔒</div>
+        <h2 class="ar-modal-title">Включить камеру AR</h2>
+        <p class="ar-modal-desc">
+          Браузер телефона блокирует камеру на <code>http://</code>.<br>
+          Перейдите на <b>HTTPS</b>, чтобы включить камеру и реальный фон!
+        </p>
+        <button id="btn-goto-https" class="ar-btn-primary">
+          <span>🚀</span>
+          <span>Перейти на HTTPS (с камерой)</span>
+        </button>
+        <div class="ar-help-box">
+          <b>ℹ️ Инструкция для телефона:</b><br>
+          1. Нажмите зелёную кнопку выше.<br>
+          2. При предупреждении браузера нажмите <b>«Дополнительно» / «Подробнее» ➔ «Перейти на сайт»</b>.<br>
+          3. Нажмите <b>«Разрешить»</b> доступ к камере!
+        </div>
+        <button id="btn-skip-https" class="ar-btn-secondary">Остаться на виртуальном фоне</button>
+      </div>
+    </div>
+
+    <!-- CAMERA GATE (запрос разрешения камеры на странице) -->
+    <div id="camera-gate" class="ar-modal" style="display:none;">
+      <div class="ar-modal-card">
+        <div class="ar-modal-icon">📷✨</div>
+        <h2 class="ar-modal-title">Включить камеру AR</h2>
+        <p class="ar-modal-desc">
+          Разрешите доступ к камере телефона, чтобы перенести Изумрудный Город, ураган и сказочных героев прямо в вашу реальную комнату!
+        </p>
+        <button id="btn-request-cam" class="ar-btn-primary">
+          <span>📸</span>
+          <span>Разрешить камеру</span>
+        </button>
+        <button id="btn-mock-mode" class="ar-btn-secondary">Играть на виртуальном фоне</button>
+        <div id="camera-gate-error" class="ar-status-error"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════ SCENE 1: 3D AR HURRICANE & POSTER ═══════════ -->
+    <section id="scene1">
+      <div id="three-container"></div>
+      <canvas id="swipe-trail"></canvas>
+
+      <div id="swipe-hud">
+        <div id="swipe-gems">
+          <div class="swipe-gem" id="gem-1">🌪️</div>
+          <div class="swipe-gem" id="gem-2">🌪️</div>
+          <div class="swipe-gem" id="gem-3">🌪️</div>
+        </div>
+        <div id="swipe-hint">
+          <span>👈👉</span>
+          <span id="swipe-hint-text">Смахни ураган 3 раза, чтобы развеять бурю</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ SCENE 2 & 3: 3D WORLD ═══════════ -->
+    <main id="world">
+      <div id="cam">
+
+        <!-- FRONT — Изумрудный Город -->
+        <div id="view-front">
+          <img id="city-img" src="assets/emerald_city.svg" alt="Изумрудный Город" draggable="false" />
+
+          <!-- Герои входят в ворота (сцена 3) -->
+          <div id="scene3-heroes">
+            <img class="hero-s3 hero-toto"      src="assets/hero_toto.svg"      alt="Тотошка" />
+            <img class="hero-s3 hero-ellie"     src="assets/hero_ellie.svg"     alt="Элли" />
+            <img class="hero-s3 hero-scarecrow" src="assets/hero_scarecrow.svg" alt="Страшила" />
+            <img class="hero-s3 hero-woodman"   src="assets/hero_woodman.svg"   alt="Дровосек" />
+            <img class="hero-s3 hero-lion"      src="assets/hero_lion.svg"      alt="Лев" />
+          </div>
+        </div>
+
+        <!-- BACK — Дорога и герои идут издалека -->
+        <div id="view-back">
+          <img id="road-img" src="assets/road.svg" alt="Дорога" draggable="false" />
+
+          <!-- Герои — идут из глубины (начинают крохотными) -->
+          <div id="heroes">
+            <div id="bubble">Идём в Изумрудный Город! ✨</div>
+            <img class="hero hero-toto"      src="assets/hero_toto.svg"      alt="Тотошка" />
+            <img class="hero hero-ellie"     src="assets/hero_ellie.svg"     alt="Элли" />
+            <img class="hero hero-scarecrow" src="assets/hero_scarecrow.svg" alt="Страшила" />
+            <img class="hero hero-woodman"   src="assets/hero_woodman.svg"   alt="Дровосек" />
+            <img class="hero hero-lion"      src="assets/hero_lion.svg"      alt="Лев" />
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <div id="flash"></div>
+    <div id="ar-badge">AR • Изумрудный Город</div>
+  </div>
+
+  <script>
+  (function(){
+  'use strict';
+
+  // ─── STATE ───────────────────────────────────────────
+  const S = {
+    scene: 1,
+    soundOn: true,
+    camYaw: 0,       // current virtual camera angle 0..360
+    heroScale: 0.06, // 0.06 (far) → 1.0 (close)
+    heroWalkActive: false,
+  };
+
+  // ─── DOM ─────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const camVideo   = $('camera-video');
+  const mockBg     = $('mock-bg');
+  const badge      = $('stage-badge');
+  const flash      = $('flash');
+  const btnCam     = $('btn-cam');
+  const btnSound   = $('btn-sound');
+  const btnReset   = $('btn-reset');
+
+  // Scene 1 elements
+  const scene1       = $('scene1');
+  const threeCont    = $('three-container');
+  const swipeTrailEl = $('swipe-trail');
+  const gem1         = $('gem-1');
+  const gem2         = $('gem-2');
+  const gem3         = $('gem-3');
+  const swipeHint    = $('swipe-hint');
+  const swipeHintText= $('swipe-hint-text');
+
+  // Scene 2/3
+  const world      = $('world');
+  const cam        = $('cam');
+  const cityImg    = $('city-img');
+  const roadImg    = $('road-img');
+  const heroes     = $('heroes');
+  const bubble     = $('bubble');
+  const s3heroes   = $('scene3-heroes');
+
+  // ─── AUDIO ───────────────────────────────────────────
+  let audioCtx = null;
+  function getCtx(){
+    if(!audioCtx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC) audioCtx = new AC();
+    }
+    if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  const sfx = {
+    wind(vol=0.15){
+      const ctx=getCtx(); if(!ctx||!S.soundOn) return;
+      try{
+        const buf=ctx.createBuffer(1,ctx.sampleRate*.12,ctx.sampleRate);
+        const d=buf.getChannelData(0);
+        for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+        const src=ctx.createBufferSource(); src.buffer=buf;
+        const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=350+vol*500; f.Q.value=3;
+        const g=ctx.createGain(); g.gain.setValueAtTime(vol*.4,ctx.currentTime); g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.12);
+        src.connect(f); f.connect(g); g.connect(ctx.destination); src.start();
+      }catch(e){}
+    },
+    whoosh(){
+      const ctx=getCtx(); if(!ctx||!S.soundOn) return;
+      try{
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type='sine'; o.frequency.setValueAtTime(420,ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(70,ctx.currentTime+.65);
+        g.gain.setValueAtTime(.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.65);
+        o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+.7);
+      }catch(e){}
+    },
+    chime(){
+      const ctx=getCtx(); if(!ctx||!S.soundOn) return;
+      try{
+        [523.25,659.25,783.99,1046.5].forEach((fr,i)=>{
+          const o=ctx.createOscillator(); const g=ctx.createGain();
+          o.type='triangle'; o.frequency.value=fr;
+          const t=ctx.currentTime+i*.13;
+          g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.18,t+.05);
+          g.gain.exponentialRampToValueAtTime(.001,t+.9);
+          o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+.95);
+        });
+      }catch(e){}
+    },
+    snap(){
+      const ctx=getCtx(); if(!ctx||!S.soundOn) return;
+      try{
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type='sawtooth'; o.frequency.setValueAtTime(200,ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(80,ctx.currentTime+.22);
+        g.gain.setValueAtTime(.15,ctx.currentTime); g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.22);
+        o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+.25);
+      }catch(e){}
+    },
+    tada(){
+      const ctx=getCtx(); if(!ctx||!S.soundOn) return;
+      try{
+        [659.25,783.99,987.77,1318.5].forEach((fr,i)=>{
+          const o=ctx.createOscillator(); const g=ctx.createGain();
+          o.type='triangle'; o.frequency.value=fr;
+          const t=ctx.currentTime+i*.09;
+          g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.22,t+.04);
+          g.gain.exponentialRampToValueAtTime(.001,t+1.1);
+          o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+1.2);
+        });
+      }catch(e){}
+    },
+    step(vol=0.08){
+      const ctx=getCtx(); if(!ctx||!S.soundOn) return;
+      try{
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.type='triangle';
+        o.frequency.setValueAtTime(290 + Math.random()*80, ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(130, ctx.currentTime + 0.05);
+        g.gain.setValueAtTime(vol * 0.22, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(); o.stop(ctx.currentTime + 0.06);
+      }catch(e){}
+    }
+  };
+
+  // ─── CAMERA & AR MODALS ──────────────────────────────
+  const httpsModal    = $('https-modal');
+  const btnGotoHttps  = $('btn-goto-https');
+  const btnSkipHttps  = $('btn-skip-https');
+  const cameraGate    = $('camera-gate');
+  const btnRequestCam = $('btn-request-cam');
+  const btnMockMode   = $('btn-mock-mode');
+  const camGateError  = $('camera-gate-error');
+
+  let serverInfo = null;
+
+  function isSecureConnection() {
+    return window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  }
+
+  function getHttpsUrl() {
+    if (serverInfo && serverInfo.phone_url) return serverInfo.phone_url;
+    const host = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? '192.168.0.100' : location.hostname;
+    const port = (serverInfo && serverInfo.https_port) ? serverInfo.https_port : 8443;
+    return `https://${host}:${port}${location.pathname}${location.search}`;
+  }
+
+  if (btnGotoHttps) {
+    btnGotoHttps.addEventListener('click', () => {
+      location.href = getHttpsUrl();
+    });
+  }
+
+  if (btnSkipHttps) {
+    btnSkipHttps.addEventListener('click', () => {
+      if (httpsModal) httpsModal.style.display = 'none';
+      getCtx();
+    });
+  }
+
+  if (btnMockMode) {
+    btnMockMode.addEventListener('click', () => {
+      if (cameraGate) cameraGate.style.display = 'none';
+      getCtx();
+    });
+  }
+
+  let cameraActive = false;
+
+  function showCamError(html) {
+    if (camGateError) {
+      camGateError.innerHTML = html;
+      camGateError.style.display = 'block';
+    }
+    if (cameraGate) cameraGate.style.display = 'flex';
+  }
+
+  async function startCamera(options = {}) {
+    const silent = !!options.silent;
+
+    // Check secure context
+    if (!isSecureConnection()) {
+      if (!silent && httpsModal) {
+        httpsModal.style.display = 'flex';
+      }
+      return false;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (!silent) {
+        showCamError('⚠️ Браузер не поддерживает доступ к камере или заблокировал WebRTC.');
+      }
+      return false;
+    }
+
+    try {
+      if (camGateError) camGateError.style.display = 'none';
+
+      let stream = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        });
+      } catch (e1) {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+
+      camVideo.srcObject = stream;
+      camVideo.setAttribute('playsinline', '');
+      camVideo.setAttribute('webkit-playsinline', '');
+      camVideo.muted = true;
+      await camVideo.play();
+
+      cameraActive = true;
+      mockBg.classList.add('hidden');
+      mockBg.style.display = 'none';
+      if (cameraGate) cameraGate.style.display = 'none';
+      if (httpsModal) httpsModal.style.display = 'none';
+      btnCam.style.borderColor = '#00ffa2';
+      btnCam.style.boxShadow = '0 0 12px rgba(0,255,162,0.6)';
+      return true;
+    } catch (err) {
+      console.warn('Camera error:', err);
+      cameraActive = false;
+      if (!silent) {
+        let msg = 'Не удалось включить камеру.<br>';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          msg = '⚠️ Доступ к камере отклонен в браузере.<br>Чтобы включить:<br>1. Нажмите на значок замочка (настройки) в строке адреса браузера.<br>2. Разрешите доступ к <b>Камере</b>.<br>3. Нажмите кнопку <b>«Разрешить камеру»</b> снова.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          msg = '⚠️ Камера не обнаружена на этом устройстве.';
+        } else {
+          msg += (err.message || 'Проверьте разрешения камеры в браузере.');
+        }
+        showCamError(msg);
+      }
+      return false;
+    }
+  }
+
+  function stopCamera() {
+    if (camVideo.srcObject) {
+      camVideo.srcObject.getTracks().forEach(t => t.stop());
+      camVideo.srcObject = null;
+    }
+    cameraActive = false;
+    mockBg.classList.remove('hidden');
+    mockBg.style.display = 'block';
+    btnCam.style.borderColor = '';
+    btnCam.style.boxShadow = '';
+  }
+
+  if (btnRequestCam) {
+    btnRequestCam.addEventListener('click', () => {
+      getCtx();
+      startCamera({ silent: false });
+    });
+  }
+
+  btnCam.addEventListener('click', () => {
+    getCtx();
+    if (cameraActive || camVideo.srcObject) {
+      stopCamera();
+    } else {
+      startCamera({ silent: false });
+    }
+  });
+
+  btnSound.addEventListener('click', () => {
+    S.soundOn = !S.soundOn;
+    btnSound.textContent = S.soundOn ? '🔊' : '🔇';
+  });
+  btnReset.addEventListener('click', () => location.reload());
+
+  // ─── POSTER BUTTON ──────────────────────────────────
+  const btnPoster = $('btn-poster');
+  if (btnPoster) {
+    btnPoster.addEventListener('click', () => {
+      window.open('/poster.html', '_blank');
+    });
+  }
+
+  // ─── PHONE CONNECTION MODAL & QR ─────────────────────
+  const phoneModal       = $('phone-modal');
+  const btnPhone         = $('btn-phone');
+  const btnCloseModal    = $('btn-close-modal');
+  const modalLink        = $('modal-phone-link');
+  const modalQr          = $('modal-qr-img');
+  const modalQrContainer = $('modal-qr-container');
+  const btnCopyUrl       = $('btn-copy-url');
+
+  if (btnCopyUrl) {
+    btnCopyUrl.addEventListener('click', () => {
+      const url = modalLink ? modalLink.href : window.location.href;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          btnCopyUrl.textContent = '✅ Ссылка скопирована!';
+          setTimeout(() => { btnCopyUrl.textContent = '📋 Скопировать ссылку'; }, 2000);
+        }).catch(() => {
+          prompt('Скопируйте ссылку на сайт:', url);
+        });
+      } else {
+        prompt('Скопируйте ссылку на сайт:', url);
+      }
+    });
+  }
+
+  function getSiteUrl() {
+    if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && !location.hostname.startsWith('192.168.')) {
+      return window.location.origin + window.location.pathname;
+    }
+    if (serverInfo && serverInfo.public_url) return serverInfo.public_url;
+    if (serverInfo && serverInfo.phone_url)  return serverInfo.phone_url;
+    return window.location.href;
+  }
+
+  function updatePhoneModalUrl(url) {
+    if (!modalLink) return;
+    const finalUrl = url || getSiteUrl();
+    modalLink.textContent = finalUrl;
+    modalLink.href = finalUrl;
+
+    if (typeof QRCode !== 'undefined' && modalQrContainer) {
+      try {
+        modalQrContainer.innerHTML = '';
+        new QRCode(modalQrContainer, {
+          text: finalUrl,
+          width: 160,
+          height: 160,
+          colorDark: "#022416",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+        return;
+      } catch (e) {
+        console.warn('Local QRCode fallback to API:', e);
+      }
+    }
+
+    if (modalQr) {
+      modalQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(finalUrl)}`;
+    }
+  }
+
+  // Если открыто на настоящем сайте в интернете — сразу генерируем ссылку на этот сайт
+  if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && !location.hostname.startsWith('192.168.')) {
+    updatePhoneModalUrl(window.location.origin + window.location.pathname);
+  } else {
+    fetch('/api/info')
+      .then(r => r.json())
+      .then(d => {
+        if (d) {
+          serverInfo = d;
+          updatePhoneModalUrl(d.public_url || d.phone_url);
+        }
+      })
+      .catch(() => {
+        updatePhoneModalUrl(window.location.href);
+      });
+  }
+
+  if (btnPhone) {
+    btnPhone.addEventListener('click', () => {
+      phoneModal.style.display = 'flex';
+    });
+  }
+  if (btnCloseModal) {
+    btnCloseModal.addEventListener('click', () => {
+      phoneModal.style.display = 'none';
+    });
+  }
+  if (phoneModal) {
+    phoneModal.addEventListener('click', (e) => {
+      if (e.target === phoneModal) phoneModal.style.display = 'none';
+    });
+  }
+
+  // ─── VIRTUAL CAMERA YAW ──────────────────────────────
+  function setYaw(y){
+    S.camYaw = y;
+    cam.style.transform = `rotateY(${-y}deg)`;
+  }
+
+  // Smooth animated rotation
+  function rotateTo(target, durationMs, onDone){
+    const start = S.camYaw;
+    let diff = target - start;
+    if(diff >  180) diff -= 360;
+    if(diff < -180) diff += 360;
+    const t0 = performance.now();
+    function step(t){
+      const p = Math.min((t-t0)/durationMs, 1);
+      const e = .5 - Math.cos(p*Math.PI)*.5; // ease in-out sine
+      setYaw((start + diff*e + 360) % 360);
+      if(p < 1) requestAnimationFrame(step);
+      else { setYaw((target+360)%360); onDone && onDone(); }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ─── FLASH HELPER ────────────────────────────────────
+  function doFlash(color='#00ffa2', hold=250){
+    flash.style.background=color;
+    flash.style.opacity='.7';
+    setTimeout(()=>{ flash.style.opacity='0'; }, hold);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  SCENE 1 — 3D AR POSTER, TORNADO & HOUSE MINI-GAME
+  // ═══════════════════════════════════════════════════════
+  let tScene, tCamera, tRenderer, tClock;
+  let tAnimId = null;
+  let dioramaGroup;
+  let posterMesh, clearingGroup;
+  let witchCottageGroup, witchLegsGroup, starSparklesPoints;
+  let tornadoGroup, tornadoRings = [], vortexParticles, vortexParticleData = [];
+  let windRibbons = [], debrisList = [], groundSwirlMesh, vortexLight;
+  let houseGroup, houseShutters = [];
+  let dustBurstPuffs = [];
+  let starSparkleData = [];
+
+  // Textures
+  let woodPlankTexture, roofShingleTexture, stoneWallTexture, cloudAlphaTexture, posterTexture, witchRoofTexture, stripesTexture;
+
+  // Swipe & House States
+  let swipeCount = 0;
+  let houseState = 'ORBITING'; // 'ORBITING' | 'LAUNCHING' | 'LANDED'
+  let tornadoTiltCurrent = { x: 0, z: 0 };
+  let tornadoTiltTarget  = { x: 0, z: 0 };
+  let tornadoSpeedMult   = 1.0;
+  let tornadoBlowAway    = false;
+  let tornadoBlowVel     = new THREE.Vector3();
+  let tornadoOpacity     = 1.0;
+
+  const TORNADO_ORIGIN = new THREE.Vector3(-0.6, 0, 0);
+  const WITCH_LANDING  = new THREE.Vector3(2.0, 0.38, 0.35);
+
+  const houseFlight = {
+    startTime: 0,
+    duration: 1350,
+    startPos: new THREE.Vector3(),
+    startRot: new THREE.Euler(),
+    targetPos: WITCH_LANDING.clone()
+  };
+
+  let houseBouncePhase = 0;
+  let witchSquash = 1.0;
+  let legsSlide = 0.0;
+
+  // Swipe gesture & trail
+  let isPointerDown = false;
+  let pointerStart = { x: 0, y: 0, time: 0 };
+  let pointerLast  = { x: 0, y: 0 };
+  let swipeTrailPoints = [];
+  let swipeCanvasCtx = null;
+
+  function initThreeScene1() {
+    if (!threeCont) return;
+
+    // 1. Scene & Transparent Renderer (AR camera feed shines through!)
+    tScene = new THREE.Scene();
+
+    const w = threeCont.clientWidth || window.innerWidth;
+    const h = threeCont.clientHeight || window.innerHeight;
+    const aspect = w / h;
+
+    tCamera = new THREE.PerspectiveCamera(aspect < 1 ? 55 : 46, aspect, 0.1, 100);
+    tCamera.position.set(0.2, 4.0, 8.4);
+    tCamera.lookAt(0.2, 1.25, 0);
+
+    tRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    tRenderer.setSize(w, h);
+    tRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    tRenderer.setClearColor(0x000000, 0);
+    tRenderer.shadowMap.enabled = true;
+    tRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    threeCont.appendChild(tRenderer.domElement);
+
+    tClock = new THREE.Clock();
+
+    // 2. Lighting
+    const hemiLight = new THREE.HemisphereLight(0xdcfce7, 0x1e293b, 0.88);
+    hemiLight.position.set(0, 15, 0);
+    tScene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.35);
+    dirLight.position.set(6, 12, 7);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    tScene.add(dirLight);
+
+    vortexLight = new THREE.PointLight(0x38bdf8, 1.3, 8);
+    vortexLight.position.set(-0.6, 2.2, 0);
+    tScene.add(vortexLight);
+
+    // 3. Root Group for diorama
+    dioramaGroup = new THREE.Group();
+    dioramaGroup.name = "AR_Poster_Clearing_Diorama";
+    tScene.add(dioramaGroup);
+
+    // 4. Procedural Textures & 3D Objects
+    generateAllTextures();
+    createPosterAndClearing();
+    createWitchCottage();
+    createTornado();
+    createHouse();
+    createDustBurstSystem();
+    createStarSparkles();
+
+    // 5. Swipe canvas & pointer events
+    setupSwipeTrailCanvas();
+    setupSwipeEvents();
+
+    window.addEventListener('resize', onThreeResize);
+
+    // 6. Start animation loop
+    tAnimId = requestAnimationFrame(threeRenderLoop);
+  }
+
+  function onThreeResize() {
+    if (!tCamera || !tRenderer || !threeCont) return;
+    const w = threeCont.clientWidth || window.innerWidth;
+    const h = threeCont.clientHeight || window.innerHeight;
+    const aspect = w / h;
+    tCamera.aspect = aspect;
+    tCamera.fov = aspect < 1 ? 55 : 46;
+    tCamera.updateProjectionMatrix();
+    tRenderer.setSize(w, h);
+    if (swipeTrailEl) {
+      swipeTrailEl.width = w;
+      swipeTrailEl.height = h;
+    }
+  }
+
+  // ─── PROCEDURAL CANVAS TEXTURES ───────────────────────
+  function generateAllTextures() {
+    // 1. Деревянные доски
+    const woodC = document.createElement('canvas');
+    woodC.width = 512; woodC.height = 512;
+    const wCtx = woodC.getContext('2d');
+    wCtx.fillStyle = '#8c5832';
+    wCtx.fillRect(0, 0, 512, 512);
+    for (let p = 0; p < 8; p++) {
+      const y0 = p * 64;
+      const shade = (p % 2 === 0 ? 8 : -8);
+      wCtx.fillStyle = `rgb(${138 + shade}, ${86 + shade * 0.7}, ${48 + shade * 0.5})`;
+      wCtx.fillRect(0, y0, 512, 62);
+      for (let i = 0; i < 40; i++) {
+        wCtx.strokeStyle = i % 3 === 0 ? 'rgba(62, 34, 15, 0.25)' : 'rgba(185, 128, 78, 0.18)';
+        wCtx.lineWidth = 1 + Math.random() * 2;
+        wCtx.beginPath();
+        const ly = y0 + 3 + Math.random() * 56;
+        wCtx.moveTo(0, ly);
+        for (let x = 0; x <= 512; x += 32) wCtx.lineTo(x, ly + Math.sin(x * 0.03 + i) * 2.2);
+        wCtx.stroke();
+      }
+      wCtx.fillStyle = '#2d180a';
+      wCtx.fillRect(0, y0 + 61, 512, 3);
+    }
+    woodPlankTexture = new THREE.CanvasTexture(woodC);
+    woodPlankTexture.wrapS = woodPlankTexture.wrapT = THREE.RepeatWrapping;
+
+    // 2. Гонтовая черепица крыши
+    const roofC = document.createElement('canvas');
+    roofC.width = 512; roofC.height = 512;
+    const rCtx = roofC.getContext('2d');
+    rCtx.fillStyle = '#3b2314';
+    rCtx.fillRect(0, 0, 512, 512);
+    const rows = 12, cols = 10, rH = 512 / rows, cW = 512 / cols;
+    for (let r = 0; r < rows; r++) {
+      const off = (r % 2) * (cW * 0.5);
+      for (let c = -1; c <= cols; c++) {
+        const v = Math.floor(Math.random() * 18 - 9);
+        rCtx.fillStyle = `rgb(${74 + v}, ${45 + v}, ${32 + v})`;
+        rCtx.fillRect(c * cW + off + 1, r * rH + 1, cW - 3, rH - 3);
+      }
+      rCtx.fillStyle = 'rgba(15, 8, 4, 0.55)';
+      rCtx.fillRect(0, (r + 1) * rH - 3, 512, 3);
+    }
+    roofShingleTexture = new THREE.CanvasTexture(roofC);
+    roofShingleTexture.wrapS = roofShingleTexture.wrapT = THREE.RepeatWrapping;
+
+    // 3. Каменная кладка трубы и цоколя
+    const stoneC = document.createElement('canvas');
+    stoneC.width = 256; stoneC.height = 256;
+    const sCtx = stoneC.getContext('2d');
+    sCtx.fillStyle = '#475569';
+    sCtx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 60; i++) {
+      const g = 95 + Math.floor(Math.random() * 50);
+      sCtx.fillStyle = `rgb(${g}, ${g - 3}, ${g - 8})`;
+      const sx = Math.random() * 240, sy = Math.random() * 240;
+      sCtx.beginPath();
+      if (sCtx.roundRect) sCtx.roundRect(sx, sy, 22 + Math.random() * 20, 14 + Math.random() * 12, 4);
+      else sCtx.rect(sx, sy, 22 + Math.random() * 20, 14 + Math.random() * 12);
+      sCtx.fill();
+      sCtx.strokeStyle = '#1e293b'; sCtx.lineWidth = 2; sCtx.stroke();
+    }
+    stoneWallTexture = new THREE.CanvasTexture(stoneC);
+    stoneWallTexture.wrapS = stoneWallTexture.wrapT = THREE.RepeatWrapping;
+
+    // 4. Текстура мягкого облака для частиц вихря
+    const cloudC = document.createElement('canvas');
+    cloudC.width = 128; cloudC.height = 128;
+    const clCtx = cloudC.getContext('2d');
+    const grad = clCtx.createRadialGradient(64, 64, 4, 64, 64, 60);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+    grad.addColorStop(0.45, 'rgba(226, 232, 240, 0.65)');
+    grad.addColorStop(1, 'rgba(148, 163, 184, 0.0)');
+    clCtx.fillStyle = grad;
+    clCtx.fillRect(0, 0, 128, 128);
+    cloudAlphaTexture = new THREE.CanvasTexture(cloudC);
+
+    // 5. Афиша фильма (AR-постер на плоскости)
+    const postC = document.createElement('canvas');
+    postC.width = 768; postC.height = 512;
+    const pCtx = postC.getContext('2d');
+    const pGrad = pCtx.createLinearGradient(0, 0, 768, 512);
+    pGrad.addColorStop(0, '#022416');
+    pGrad.addColorStop(0.5, '#064d2d');
+    pGrad.addColorStop(1, '#01190f');
+    pCtx.fillStyle = pGrad;
+    pCtx.fillRect(0, 0, 768, 512);
+
+    // Золотая рамка и орнаменты афиши
+    pCtx.strokeStyle = '#ffd53d';
+    pCtx.lineWidth = 8;
+    pCtx.strokeRect(16, 16, 736, 480);
+    pCtx.strokeStyle = 'rgba(255, 213, 61, 0.4)';
+    pCtx.lineWidth = 2;
+    pCtx.strokeRect(26, 26, 716, 460);
+
+    // Текст афиши
+    pCtx.textAlign = 'center';
+    pCtx.fillStyle = '#6ee7b7';
+    pCtx.font = 'bold 20px -apple-system, sans-serif';
+    pCtx.fillText('ФИЛЬМ-СКАЗКА В КИНО • AR ОЖИВШИЙ МИР', 384, 65);
+
+    pCtx.fillStyle = '#ffd53d';
+    pCtx.font = '900 38px -apple-system, sans-serif';
+    pCtx.shadowColor = '#00ffa2';
+    pCtx.shadowBlur = 18;
+    pCtx.fillText('ВОЛШЕБНИК ИЗУМРУДНОГО ГОРОДА', 384, 120);
+    pCtx.shadowBlur = 0;
+
+    pCtx.fillStyle = '#ffffff';
+    pCtx.font = 'bold 22px -apple-system, sans-serif';
+    pCtx.fillText('ДОРОГА ИЗ ЖЁЛТОГО КИРПИЧА', 384, 160);
+
+    // Силуэт Изумрудного Города на афише
+    pCtx.fillStyle = 'rgba(0, 255, 162, 0.22)';
+    pCtx.beginPath();
+    pCtx.moveTo(280, 380);
+    pCtx.lineTo(330, 230); pCtx.lineTo(350, 260); pCtx.lineTo(384, 190);
+    pCtx.lineTo(418, 260); pCtx.lineTo(438, 230); pCtx.lineTo(488, 380);
+    pCtx.closePath();
+    pCtx.fill();
+
+    pCtx.fillStyle = '#a7f3d0';
+    pCtx.font = 'bold 18px -apple-system, sans-serif';
+    pCtx.fillText('🌪️ Смахните ураган 3 раза, чтобы развеять бурю! 🌪️', 384, 450);
+
+    posterTexture = new THREE.CanvasTexture(postC);
+
+    // 6. Темная черепица для домика Злой Ведьмы
+    const wRoofC = document.createElement('canvas');
+    wRoofC.width = 256; wRoofC.height = 256;
+    const wrCtx = wRoofC.getContext('2d');
+    wrCtx.fillStyle = '#26122a';
+    wrCtx.fillRect(0, 0, 256, 256);
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 6; c++) {
+        const v = Math.floor(Math.random() * 20 - 10);
+        wrCtx.fillStyle = `rgb(${48 + v}, ${20 + v}, ${55 + v})`;
+        wrCtx.fillRect(c * 42 + 2, r * 32 + 2, 38, 28);
+      }
+    }
+    witchRoofTexture = new THREE.CanvasTexture(wRoofC);
+    witchRoofTexture.wrapS = witchRoofTexture.wrapT = THREE.RepeatWrapping;
+
+    // 7. Полосатая текстура чулок Ведьмы (черно-белые/фиолетовые полосы)
+    const strC = document.createElement('canvas');
+    strC.width = 128; strC.height = 128;
+    const stCtx = strC.getContext('2d');
+    stCtx.fillStyle = '#1e1b4b'; // темный индиго/черный
+    stCtx.fillRect(0, 0, 128, 128);
+    stCtx.fillStyle = '#f8fafc'; // белый
+    for (let i = 0; i < 8; i += 2) {
+      stCtx.fillRect(0, i * 16, 128, 16);
+    }
+    stripesTexture = new THREE.CanvasTexture(strC);
+    stripesTexture.wrapS = stripesTexture.wrapT = THREE.RepeatWrapping;
+  }
+
+  // ─── POSTER BASE & ENCHANTED CLEARING ─────────────────
+  function createPosterAndClearing() {
+    // 1. Афиша фильма в AR (подиум)
+    const postGeo = new THREE.BoxGeometry(6.4, 0.08, 4.4);
+    const postMatSides = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.35 });
+    const postMatTop = new THREE.MeshStandardMaterial({ map: posterTexture, roughness: 0.65 });
+    const postMats = [postMatSides, postMatSides, postMatTop, postMatSides, postMatSides, postMatSides];
+    posterMesh = new THREE.Mesh(postGeo, postMats);
+    posterMesh.position.set(0, -0.04, 0);
+    posterMesh.receiveShadow = true;
+    dioramaGroup.add(posterMesh);
+
+    // 2. Сказочная Поляна (закрывает афишу в AR)
+    clearingGroup = new THREE.Group();
+    clearingGroup.name = "EnchantedClearing";
+
+    // Зеленый холмик-купол поляны
+    const hillGeo = new THREE.CylinderGeometry(2.65, 3.05, 0.22, 36);
+    const hillMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.8, flatShading: true });
+    const hillMesh = new THREE.Mesh(hillGeo, hillMat);
+    hillMesh.position.y = 0.08;
+    hillMesh.receiveShadow = true;
+    clearingGroup.add(hillMesh);
+
+    // Дорожка из жёлтого кирпича, ведущая через поляну
+    const pathGeo = new THREE.RingGeometry(0.7, 1.45, 18, 1, Math.PI * 0.15, Math.PI * 0.85);
+    pathGeo.rotateX(-Math.PI / 2);
+    const pathMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.75, side: THREE.DoubleSide });
+    const pathMesh = new THREE.Mesh(pathGeo, pathMat);
+    pathMesh.position.set(0.6, 0.20, 0.1);
+    pathMesh.rotation.y = 0.3;
+    clearingGroup.add(pathMesh);
+
+    // Сказочные полевые цветы на поляне
+    const flowerColors = [0xef4444, 0xfde047, 0x38bdf8, 0xc084fc, 0xffffff];
+    const flowerGeo = new THREE.DodecahedronGeometry(0.04, 0);
+    for (let f = 0; f < 32; f++) {
+      const col = flowerColors[f % flowerColors.length];
+      const flMat = new THREE.MeshBasicMaterial({ color: col });
+      const flower = new THREE.Mesh(flowerGeo, flMat);
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 0.8 + Math.random() * 1.85;
+      flower.position.set(Math.cos(angle) * radius, 0.20, Math.sin(angle) * radius);
+      flower.scale.y = 0.5;
+      clearingGroup.add(flower);
+    }
+
+    // Сказочные деревца по краям поляны
+    function addTree(x, z, scale = 1.0) {
+      const tg = new THREE.Group();
+      tg.position.set(x, 0.20, z);
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05 * scale, 0.08 * scale, 0.42 * scale, 6),
+        new THREE.MeshStandardMaterial({ color: 0x5c2d0c, roughness: 0.9 })
+      );
+      trunk.position.y = 0.21 * scale;
+      tg.add(trunk);
+      const crown = new THREE.Mesh(
+        new THREE.ConeGeometry(0.35 * scale, 0.82 * scale, 7),
+        new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75, flatShading: true })
+      );
+      crown.position.y = 0.65 * scale;
+      crown.castShadow = true;
+      tg.add(crown);
+      clearingGroup.add(tg);
+    }
+    addTree(-2.1, -1.2, 1.1);
+    addTree(-2.3, 1.0, 0.85);
+    addTree(0.3, -1.4, 0.95);
+    addTree(2.5, -1.1, 1.05);
+
+    dioramaGroup.add(clearingGroup);
+  }
+
+  // ─── WICKED WITCH'S CROOKED COTTAGE & SHOES ──────────
+  function createWitchCottage() {
+    witchCottageGroup = new THREE.Group();
+    witchCottageGroup.name = "WickedWitchCottage";
+    witchCottageGroup.position.copy(WITCH_LANDING);
+
+    const witchMatWalls = new THREE.MeshStandardMaterial({ color: 0x3d1a3b, roughness: 0.85 });
+    const witchMatRoof  = new THREE.MeshStandardMaterial({ map: witchRoofTexture, roughness: 0.85 });
+    const witchMatStone = new THREE.MeshStandardMaterial({ map: stoneWallTexture, roughness: 0.9 });
+    const witchGlowMat  = new THREE.MeshStandardMaterial({ color: 0xbef264, emissive: 0x84cc16, emissiveIntensity: 0.9 });
+
+    // 1. Каменный цоколь
+    const foundation = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.12, 0.84), witchMatStone);
+    foundation.position.set(0, 0.06, 0);
+    witchCottageGroup.add(foundation);
+
+    // 2. Кривые деревянные стены (характерная сказочная кривизна)
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.58, 0.76), witchMatWalls);
+    walls.position.set(0, 0.40, 0);
+    walls.rotation.z = -0.06;
+    walls.rotation.y = 0.08;
+    witchCottageGroup.add(walls);
+
+    // 3. Заострённая кривая крыша
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.74, 0.85, 4), witchMatRoof);
+    roof.position.set(0.04, 0.98, 0);
+    roof.rotation.y = Math.PI / 4;
+    roof.rotation.z = -0.12;
+    witchCottageGroup.add(roof);
+
+    // 4. Кривая печная труба с фиолетовым свечением
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.44, 0.14), witchMatStone);
+    chimney.position.set(0.25, 0.92, -0.15);
+    chimney.rotation.z = 0.15;
+    witchCottageGroup.add(chimney);
+
+    // 5. Окошко с жутким зеленоватым светом
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.05), witchGlowMat);
+    win.position.set(0, 0.44, 0.39);
+    witchCottageGroup.add(win);
+
+    dioramaGroup.add(witchCottageGroup);
+
+    // 6. Полосатые ножки Ведьмы и Серебряные башмачки
+    witchLegsGroup = new THREE.Group();
+    witchLegsGroup.name = "WitchStripedLegs";
+    witchLegsGroup.position.set(WITCH_LANDING.x, 0.16, WITCH_LANDING.z + 0.12);
+
+    const legMat = new THREE.MeshStandardMaterial({ map: stripesTexture, roughness: 0.65 });
+    const shoeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.18 });
+    const rubyMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+
+    [-0.14, 0.14].forEach((lx, idx) => {
+      const legSub = new THREE.Group();
+      legSub.position.set(lx, 0, 0);
+
+      // Чулки
+      const legGeo = new THREE.CylinderGeometry(0.038, 0.042, 0.38, 12);
+      legGeo.rotateX(Math.PI / 2.3);
+      const legMesh = new THREE.Mesh(legGeo, legMat);
+      legSub.add(legMesh);
+
+      // Серебряный башмачок с загнутым сказочным носком
+      const shoeGroup = new THREE.Group();
+      shoeGroup.position.set(0, -0.02, 0.22);
+
+      const shoeBody = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.14), shoeMat);
+      shoeGroup.add(shoeBody);
+
+      // Загнутый носок
+      const toeTip = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.08, 8), shoeMat);
+      toeTip.rotation.x = -Math.PI / 3;
+      toeTip.position.set(0, 0.025, 0.08);
+      shoeGroup.add(toeTip);
+
+      // Сверкающая пряжка
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.02), rubyMat);
+      buckle.position.set(0, 0.03, 0.02);
+      shoeGroup.add(buckle);
+
+      legSub.add(shoeGroup);
+      witchLegsGroup.add(legSub);
+    });
+
+    witchLegsGroup.visible = false;
+    dioramaGroup.add(witchLegsGroup);
+  }
+
+  // ─── 3D TORNADO (УРАГАН) ─────────────────────────────
+  function createTornado() {
+    tornadoGroup = new THREE.Group();
+    tornadoGroup.name = "TornadoVortex";
+    tornadoGroup.position.copy(TORNADO_ORIGIN);
+    dioramaGroup.add(tornadoGroup);
+
+    tornadoRings = [];
+    const numSlices = 28;
+    const maxHeight = 5.2;
+
+    for (let i = 0; i < numSlices; i++) {
+      const t = i / (numSlices - 1);
+      const radius = 0.22 + Math.pow(t, 1.55) * 1.85 + (t > 0.82 ? Math.pow(t - 0.82, 1.2) * 1.8 : 0);
+      const heightStep = (maxHeight / numSlices) * 1.55;
+
+      const sliceGeo = new THREE.CylinderGeometry(radius * 1.08, radius * 0.92, heightStep, 20, 1, true);
+      const posAttr = sliceGeo.attributes.position;
+      for (let v = 0; v < posAttr.count; v++) {
+        const vx = posAttr.getX(v), vz = posAttr.getZ(v);
+        const angle = Math.atan2(vz, vx);
+        const n = Math.sin(angle * 3 + i * 0.9) * 0.08 + Math.cos(angle * 5 - i) * 0.05;
+        posAttr.setX(v, vx * (1 + n));
+        posAttr.setZ(v, vz * (1 + n));
+      }
+      sliceGeo.computeVertexNormals();
+
+      const hue = 0.56 - (1 - t) * 0.46;
+      const sat = 0.22 + (1 - t) * 0.15;
+      const light = 0.26 + t * 0.22;
+      const sliceColor = new THREE.Color().setHSL(hue, sat, light);
+
+      const sliceMat = new THREE.MeshStandardMaterial({
+        color: sliceColor,
+        roughness: 0.88,
+        metalness: 0.05,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: (0.65 - t * 0.18),
+        depthWrite: false
+      });
+
+      const sliceMesh = new THREE.Mesh(sliceGeo, sliceMat);
+      sliceMesh.position.y = 0.15 + t * maxHeight;
+      sliceMesh.rotation.y = i * 0.55;
+      sliceMesh.userData = {
+        t: t,
+        speedFactor: (2.2 - t * 0.85) * (i % 2 === 0 ? 1 : 0.92),
+        currentX: 0,
+        currentZ: 0
+      };
+      tornadoGroup.add(sliceMesh);
+      tornadoRings.push(sliceMesh);
+    }
+
+    // Приземный пылевой буран
+    const groundSwirlGeo = new THREE.CylinderGeometry(1.65, 0.45, 0.75, 24, 2, true);
+    const groundSwirlMat = new THREE.MeshStandardMaterial({
+      color: 0x786452,
+      roughness: 0.95,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    groundSwirlMesh = new THREE.Mesh(groundSwirlGeo, groundSwirlMat);
+    groundSwirlMesh.position.y = 0.38;
+    tornadoGroup.add(groundSwirlMesh);
+
+    // 1200 объёмных частиц пыли и облаков
+    const pCount = 1200;
+    const pGeo = new THREE.BufferGeometry();
+    const positions = new Float32Array(pCount * 3);
+    const colors = new Float32Array(pCount * 3);
+    vortexParticleData = [];
+    const tmpColor = new THREE.Color();
+
+    for (let i = 0; i < pCount; i++) {
+      const t = Math.random();
+      const angle = Math.random() * Math.PI * 2;
+      const isBaseDust = i < 280;
+      const h = isBaseDust ? Math.random() * 0.18 : t;
+      const radiusSpread = isBaseDust
+        ? (0.35 + Math.random() * 1.45)
+        : (0.24 + Math.pow(h, 1.55) * 2.05) * (0.82 + Math.random() * 0.45);
+
+      vortexParticleData.push({
+        h: h,
+        isBaseDust: isBaseDust,
+        angle: angle,
+        angularSpeed: (isBaseDust ? 5.5 : 3.2 + (1 - h) * 3.5) * (0.85 + Math.random() * 0.35),
+        riseSpeed: isBaseDust ? 0.25 : 0.22 + Math.random() * 0.25,
+        radiusSpread: radiusSpread
+      });
+
+      positions[i * 3]     = Math.cos(angle) * radiusSpread;
+      positions[i * 3 + 1] = h * maxHeight;
+      positions[i * 3 + 2] = Math.sin(angle) * radiusSpread;
+
+      if (isBaseDust || h < 0.22) tmpColor.setHSL(0.08, 0.28, 0.36 + Math.random() * 0.15);
+      else tmpColor.setHSL(0.56, 0.18, 0.45 + h * 0.28);
+
+      colors[i * 3]     = tmpColor.r;
+      colors[i * 3 + 1] = tmpColor.g;
+      colors[i * 3 + 2] = tmpColor.b;
+    }
+
+    pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    pGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const pMat = new THREE.PointsMaterial({
+      size: 0.44,
+      map: cloudAlphaTexture,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      blending: THREE.NormalBlending
+    });
+
+    vortexParticles = new THREE.Points(pGeo, pMat);
+    tornadoGroup.add(vortexParticles);
+
+    // Спиральные ветровые ленты (Wind ribbons)
+    windRibbons = [];
+    for (let r = 0; r < 12; r++) {
+      const t = (r + 0.5) / 12;
+      const radius = 0.45 + Math.pow(t, 1.45) * 2.25;
+      const arcGeo = new THREE.TorusGeometry(radius, 0.018, 5, 28, Math.PI * (0.65 + Math.random() * 0.55));
+      arcGeo.rotateX(Math.PI / 2);
+      const arcMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.32, depthWrite: false });
+      const ribbon = new THREE.Mesh(arcGeo, arcMat);
+      ribbon.userData = { t: t, speed: 5.5 + Math.random() * 3.5 };
+      tornadoGroup.add(ribbon);
+      windRibbons.push(ribbon);
+    }
+
+    // Летающие обломки (доски и камни)
+    debrisList = [];
+    const plankGeo = new THREE.BoxGeometry(0.26, 0.03, 0.07);
+    const rockGeo  = new THREE.DodecahedronGeometry(0.065, 0);
+    const plankMat = new THREE.MeshStandardMaterial({ map: woodPlankTexture, roughness: 0.8 });
+    const leafMat  = new THREE.MeshStandardMaterial({ color: 0x365314, roughness: 0.7 });
+
+    for (let i = 0; i < 28; i++) {
+      const isPlank = i % 2 === 0;
+      const mesh = new THREE.Mesh(isPlank ? plankGeo : rockGeo, isPlank ? plankMat : leafMat);
+      mesh.userData = {
+        t: Math.random(),
+        angle: Math.random() * Math.PI * 2,
+        speed: 3.4 + Math.random() * 4.0,
+        radiusOffset: 0.25 + Math.random() * 0.65,
+        rotSpeed: new THREE.Vector3(3 + Math.random() * 5, 4 + Math.random() * 5, 2 + Math.random() * 4)
+      };
+      tornadoGroup.add(mesh);
+      debrisList.push(mesh);
+    }
+  }
+
+  // ─── 3D CABIN HOUSE (ДОМИК ЭЛЛИ) ─────────────────────
+  function createHouse() {
+    houseGroup = new THREE.Group();
+    houseGroup.name = "EllieFlyingHouse";
+    houseShutters = [];
+
+    const cabin = new THREE.Group();
+
+    const wallWoodMat    = new THREE.MeshStandardMaterial({ map: woodPlankTexture, roughness: 0.82, metalness: 0.05 });
+    const darkTimberMat  = new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: 0.85 });
+    const lightTimberMat = new THREE.MeshStandardMaterial({ color: 0xa16638, roughness: 0.78 });
+    const roofMat        = new THREE.MeshStandardMaterial({ map: roofShingleTexture, roughness: 0.85 });
+    const stoneMat       = new THREE.MeshStandardMaterial({ map: stoneWallTexture, roughness: 0.9 });
+    const shutterMat     = new THREE.MeshStandardMaterial({ color: 0x2f5233, roughness: 0.75 });
+    const windowGlowMat  = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xd97706, emissiveIntensity: 0.75, roughness: 0.2 });
+
+    // 1. Фундамент
+    const foundation = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.14, 0.88), stoneMat);
+    foundation.position.set(0, 0.07, -0.06);
+    foundation.castShadow = true;
+    cabin.add(foundation);
+
+    // 2. Стены
+    const mainWalls = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.68, 0.82), wallWoodMat);
+    mainWalls.position.set(0, 0.48, -0.06);
+    mainWalls.castShadow = true;
+    cabin.add(mainWalls);
+
+    // Угловые стойки
+    [[-0.5, 0.48, 0.35], [0.5, 0.48, 0.35], [-0.5, 0.48, -0.47], [0.5, 0.48, -0.47]].forEach(([cx, cy, cz]) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.72, 8), darkTimberMat);
+      post.position.set(cx, cy, cz);
+      cabin.add(post);
+    });
+
+    // 3. Фронтоны и Двускатная крыша
+    const gableShape = new THREE.Shape();
+    gableShape.moveTo(-0.52, 0); gableShape.lineTo(0.52, 0); gableShape.lineTo(0, 0.46); gableShape.closePath();
+    const gableGeo = new THREE.ExtrudeGeometry(gableShape, { depth: 0.84, bevelEnabled: false });
+    const gableMesh = new THREE.Mesh(gableGeo, wallWoodMat);
+    gableMesh.position.set(0, 0.82, -0.48);
+    cabin.add(gableMesh);
+
+    const roofPivot = new THREE.Group();
+    roofPivot.position.set(0, 1.28, -0.06);
+    const slopeAngle = Math.atan2(0.46, 0.52);
+
+    const leftSlope = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.045, 1.06), roofMat);
+    leftSlope.rotation.z = slopeAngle; leftSlope.position.set(-0.27, -0.20, 0);
+    roofPivot.add(leftSlope);
+
+    const rightSlope = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.045, 1.06), roofMat);
+    rightSlope.rotation.z = -slopeAngle; rightSlope.position.set(0.27, -0.20, 0);
+    roofPivot.add(rightSlope);
+
+    const ridge = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.12, 8), darkTimberMat);
+    ridge.rotation.x = Math.PI / 2; ridge.position.set(0, 0.02, 0);
+    roofPivot.add(ridge);
+    cabin.add(roofPivot);
+
+    // 4. Печная труба
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.52, 0.17), stoneMat);
+    chimney.position.set(0.32, 1.05, -0.24);
+    cabin.add(chimney);
+
+    // 5. Крыльцо с верандой и перилами
+    const porchDeck = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.08, 0.34), darkTimberMat);
+    porchDeck.position.set(0, 0.10, 0.51);
+    cabin.add(porchDeck);
+
+    const step = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.05, 0.12), lightTimberMat);
+    step.position.set(0, 0.04, 0.72);
+    cabin.add(step);
+
+    [-0.46, -0.17, 0.17, 0.46].forEach(px => {
+      const pPost = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.48, 0.04), lightTimberMat);
+      pPost.position.set(px, 0.38, 0.64);
+      cabin.add(pPost);
+    });
+
+    const porchRoof = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.035, 0.40), roofMat);
+    porchRoof.position.set(0, 0.65, 0.52); porchRoof.rotation.x = 0.24;
+    cabin.add(porchRoof);
+
+    // 6. Окна со ставнями
+    function addWindow(wx, wy, wz, rotY) {
+      const wg = new THREE.Group();
+      wg.position.set(wx, wy, wz); wg.rotation.y = rotY;
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.04), windowGlowMat);
+      wg.add(glass);
+      const lShutter = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.20, 0.025), shutterMat);
+      lShutter.position.set(-0.14, 0, 0.02);
+      lShutter.userData = { side: -1, phase: Math.random() * 6 };
+      wg.add(lShutter);
+      houseShutters.push(lShutter);
+
+      const rShutter = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.20, 0.025), shutterMat);
+      rShutter.position.set(0.14, 0, 0.02);
+      rShutter.userData = { side: 1, phase: Math.random() * 6 };
+      wg.add(rShutter);
+      houseShutters.push(rShutter);
+
+      cabin.add(wg);
+    }
+    addWindow(-0.31, 0.44, 0.355, 0);
+    addWindow(0.31, 0.44, 0.355, 0);
+    addWindow(-0.505, 0.48, -0.06, -Math.PI / 2);
+    addWindow(0.505, 0.48, -0.06, Math.PI / 2);
+
+    cabin.position.y = -0.45;
+    houseGroup.add(cabin);
+    dioramaGroup.add(houseGroup);
+  }
+
+  // ─── DUST BURST & STAR SPARKLES ──────────────────────
+  function createDustBurstSystem() {
+    dustBurstPuffs = [];
+    const geo = new THREE.DodecahedronGeometry(0.15, 1);
+    for (let i = 0; i < 20; i++) {
+      const mat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.9, transparent: true, opacity: 0 });
+      const puff = new THREE.Mesh(geo, mat);
+      puff.visible = false;
+      puff.userData = { vel: new THREE.Vector3(), life: 0, maxLife: 0.75 };
+      dioramaGroup.add(puff);
+      dustBurstPuffs.push(puff);
+    }
+  }
+
+  function triggerDustBurst(pos) {
+    dustBurstPuffs.forEach((p, idx) => {
+      const angle = (idx / dustBurstPuffs.length) * Math.PI * 2 + Math.random() * 0.3;
+      const spd = 1.4 + Math.random() * 1.8;
+      p.position.copy(pos).add(new THREE.Vector3(0, -0.1, 0));
+      p.userData.vel.set(Math.cos(angle) * spd, 0.9 + Math.random() * 1.4, Math.sin(angle) * spd);
+      p.userData.life = 0.001;
+      p.userData.maxLife = 0.65 + Math.random() * 0.3;
+      p.scale.setScalar(0.7 + Math.random() * 0.7);
+      p.material.opacity = 0.88;
+      p.visible = true;
+    });
+  }
+
+  function createStarSparkles() {
+    const count = 36;
+    const sGeo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    starSparkleData = [];
+
+    const c1 = new THREE.Color(0xffd700);
+    const c2 = new THREE.Color(0xffffff);
+
+    for (let i = 0; i < count; i++) {
+      pos[i * 3]     = WITCH_LANDING.x + (Math.random() - 0.5) * 0.7;
+      pos[i * 3 + 1] = 0.2 + Math.random() * 0.5;
+      pos[i * 3 + 2] = WITCH_LANDING.z + 0.3 + (Math.random() - 0.5) * 0.5;
+
+      const c = (i % 2 === 0) ? c1 : c2;
+      col[i * 3]     = c.r;
+      col[i * 3 + 1] = c.g;
+      col[i * 3 + 2] = c.b;
+
+      starSparkleData.push({
+        basePos: new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]),
+        speed: 2 + Math.random() * 4,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+
+    sGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    sGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+    const sMat = new THREE.PointsMaterial({
+      size: 0.18,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    starSparklesPoints = new THREE.Points(sGeo, sMat);
+    dioramaGroup.add(starSparklesPoints);
+  }
+
+  // ─── SWIPE TRAIL & INTERACTION EVENTS ────────────────
+  function setupSwipeTrailCanvas() {
+    if (!swipeTrailEl) return;
+    swipeTrailEl.width = window.innerWidth;
+    swipeTrailEl.height = window.innerHeight;
+    swipeCanvasCtx = swipeTrailEl.getContext('2d');
+  }
+
+  function setupSwipeEvents() {
+    if (!threeCont) return;
+
+    threeCont.addEventListener('pointerdown', e => {
+      if (S.scene !== 1 || houseState !== 'ORBITING') return;
+      isPointerDown = true;
+      pointerStart = { x: e.clientX, y: e.clientY, time: performance.now() };
+      pointerLast  = { x: e.clientX, y: e.clientY };
+      swipeTrailPoints.push({ x: e.clientX, y: e.clientY, time: performance.now() });
+      getCtx();
+    });
+
+    window.addEventListener('pointermove', e => {
+      if (!isPointerDown || S.scene !== 1) return;
+      pointerLast = { x: e.clientX, y: e.clientY };
+      swipeTrailPoints.push({ x: e.clientX, y: e.clientY, time: performance.now() });
+
+      // Наклон урагана во время свайпа пальцем
+      const dx = e.clientX - pointerStart.x;
+      tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.75;
+    });
+
+    const endSwipe = () => {
+      if (!isPointerDown || S.scene !== 1) return;
+      isPointerDown = false;
+      const dt = performance.now() - pointerStart.time;
+      const dx = pointerLast.x - pointerStart.x;
+      const dy = pointerLast.y - pointerStart.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const speed = dist / (dt || 1);
+
+      // Срабатывает как при глубоком свайпе, так и при резком жесте (флик)
+      if (dist > 38 || (speed > 0.32 && dist > 18)) {
+        registerSwipe(dx >= 0 ? 1 : -1);
+      } else {
+        tornadoTiltTarget.z = 0;
+      }
+    };
+
+    window.addEventListener('pointerup', endSwipe);
+    window.addEventListener('pointercancel', endSwipe);
+
+    // Дополнительный клик по подсказке или сцене, чтобы никто не застрял
+    if (swipeHint) {
+      swipeHint.addEventListener('click', () => {
+        if (S.scene === 1 && houseState === 'ORBITING') registerSwipe(1);
+      });
+    }
+  }
+
+  // ─── 3-SWIPE MECHANIC ────────────────────────────────
+  function registerSwipe(dirX = 1) {
+    if (houseState !== 'ORBITING' || swipeCount >= 3) return;
+    swipeCount++;
+    sfx.whoosh();
+
+    if (swipeCount === 1) {
+      if (gem1) { gem1.classList.add('active'); gem1.textContent = '⚡'; }
+      tornadoTiltTarget.z = -dirX * 0.38;
+      tornadoTiltTarget.x = 0.16;
+      tornadoSpeedMult = 0.85;
+      if (swipeHintText) swipeHintText.textContent = '1-й порыв! Ураган слабеет! (Осталось 2 свайпа)';
+      badge.textContent = '🌪️ Сцена 1 — 1/3 свайпа';
+      doFlash('rgba(0, 255, 162, 0.35)', 160);
+      setTimeout(() => { if (swipeCount === 1) tornadoTiltTarget.z = 0; }, 750);
+    } else if (swipeCount === 2) {
+      if (gem2) { gem2.classList.add('active'); gem2.textContent = '⚡'; }
+      tornadoTiltTarget.z = -dirX * 0.68;
+      tornadoTiltTarget.x = 0.28;
+      tornadoSpeedMult = 0.68;
+      if (swipeHintText) swipeHintText.textContent = '2-й порыв! Ещё один сильный свайп!';
+      badge.textContent = '🌪️ Сцена 1 — 2/3 свайпа';
+      doFlash('rgba(0, 255, 162, 0.5)', 200);
+      setTimeout(() => { if (swipeCount === 2) tornadoTiltTarget.z = 0; }, 750);
+    } else if (swipeCount >= 3) {
+      if (gem3) { gem3.classList.add('active'); gem3.textContent = '⚡'; }
+      if (swipeHintText) swipeHintText.textContent = '🎉 Ураган рассеян! Домик летит на дом ведьмы!';
+      badge.textContent = '✨ Сцена 1 — Победа над бурей!';
+      doFlash('#aa88ff', 350);
+
+      // Запускаем развеивание урагана и баллистический полёт домика
+      blowTornadoAndLaunchHouse(dirX);
+    }
+  }
+
+  function blowTornadoAndLaunchHouse(dirX = 1) {
+    tornadoBlowAway = true;
+    tornadoBlowVel.set(dirX * 7.5, 2.2, -3.5);
+
+    houseState = 'LAUNCHING';
+    houseFlight.startTime = performance.now();
+    houseFlight.duration = 1400; // 1.4 секунды полёта
+    houseFlight.startPos.copy(houseGroup.position);
+    houseFlight.startRot.copy(houseGroup.rotation);
+  }
+
+  function onHouseLanded() {
+    houseState = 'LANDED';
+    houseBouncePhase = 0;
+    houseGroup.position.copy(WITCH_LANDING);
+    houseGroup.rotation.set(0, 0.12, 0);
+
+    // Звуки удара и торжества
+    sfx.snap();
+    sfx.tada();
+
+    // Облако пыли от удара
+    triggerDustBurst(WITCH_LANDING);
+
+    // Показываем серебряные башмачки, выглядывающие из-под дома
+    if (witchLegsGroup) witchLegsGroup.visible = true;
+    if (starSparklesPoints) starSparklesPoints.material.opacity = 0.9;
+
+    if (swipeHintText) swipeHintText.textContent = '👠 Домик упал на дом Злой Ведьмы! Буря утихла!';
+    badge.textContent = '👠 Сцена 1 — Серебряные башмачки!';
+
+    // Через 2.5 секунды переходим к Сцене 2 (Изумрудный Город)
+    setTimeout(() => {
+      doFlash('#00ffa2', 350);
+      stopThreeScene1();
+      scene1.style.display = 'none';
+      startScene2();
+    }, 2500);
+  }
+
+  function stopThreeScene1() {
+    if (tAnimId) {
+      cancelAnimationFrame(tAnimId);
+      tAnimId = null;
+    }
+  }
+
+  // ─── THREE.JS MAIN RENDER LOOP ───────────────────────
+  function threeRenderLoop(time) {
+    if (S.scene !== 1) return;
+    tAnimId = requestAnimationFrame(threeRenderLoop);
+
+    const dt = Math.min(tClock ? tClock.getDelta() : 0.016, 0.05);
+    const elapsed = tClock ? tClock.getElapsedTime() : (time * 0.001);
+
+    // 1. Анимация урагана (вращение, изгиб, развеивание)
+    tornadoTiltCurrent.z = THREE.MathUtils.lerp(tornadoTiltCurrent.z, tornadoTiltTarget.z, dt * 6);
+    tornadoTiltCurrent.x = THREE.MathUtils.lerp(tornadoTiltCurrent.x, tornadoTiltTarget.x, dt * 6);
+
+    if (tornadoBlowAway) {
+      tornadoGroup.position.addScaledVector(tornadoBlowVel, dt);
+      tornadoOpacity = Math.max(0, tornadoOpacity - dt * 0.75);
+      tornadoGroup.scale.multiplyScalar(Math.max(0.01, 1 - dt * 0.8));
+      tornadoRings.forEach(r => { r.material.opacity = tornadoOpacity * 0.6; });
+      if (groundSwirlMesh) groundSwirlMesh.material.opacity = tornadoOpacity * 0.45;
+      if (vortexParticles) vortexParticles.material.opacity = tornadoOpacity * 0.55;
+    } else {
+      tornadoGroup.rotation.z = tornadoTiltCurrent.z;
+      tornadoGroup.rotation.x = tornadoTiltCurrent.x;
+    }
+
+    const spinRate = (4.8 * tornadoSpeedMult) * dt;
+    for (let i = 0; i < tornadoRings.length; i++) {
+      const ring = tornadoRings[i];
+      ring.rotation.y += spinRate * ring.userData.speedFactor;
+      const sway = Math.sin(elapsed * 4.2 + i * 0.45) * 0.06;
+      ring.position.x = Math.sin(elapsed * 3.5 + i * 0.3) * sway;
+    }
+
+    if (groundSwirlMesh) groundSwirlMesh.rotation.y -= spinRate * 1.5;
+
+    // Частицы вихря
+    if (vortexParticles && !tornadoBlowAway) {
+      const posArr = vortexParticles.geometry.attributes.position.array;
+      const maxHeight = 5.2;
+      for (let i = 0; i < vortexParticleData.length; i++) {
+        const pd = vortexParticleData[i];
+        pd.angle += pd.angularSpeed * tornadoSpeedMult * dt;
+        pd.h += pd.riseSpeed * tornadoSpeedMult * dt;
+        if (pd.isBaseDust && pd.h > 0.20) pd.h = 0.01;
+        else if (pd.h > 1.0) pd.h = 0.02;
+
+        const rad = pd.isBaseDust ? pd.radiusSpread : (0.22 + Math.pow(pd.h, 1.55) * 2.05) * 0.85;
+        posArr[i * 3]     = Math.cos(pd.angle) * rad;
+        posArr[i * 3 + 1] = 0.12 + pd.h * maxHeight;
+        posArr[i * 3 + 2] = Math.sin(pd.angle) * rad;
+      }
+      vortexParticles.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // Ветровые ленты и обломки
+    windRibbons.forEach(r => { r.rotation.y += r.userData.speed * tornadoSpeedMult * dt; });
+    debrisList.forEach(d => {
+      d.userData.angle += d.userData.speed * tornadoSpeedMult * dt;
+      const r = 0.38 + Math.pow(d.userData.t, 1.4) * 1.95 + d.userData.radiusOffset;
+      d.position.set(Math.cos(d.userData.angle) * r, 0.25 + d.userData.t * 4.7, Math.sin(d.userData.angle) * r);
+      d.rotation.x += d.userData.rotSpeed.x * dt;
+      d.rotation.y += d.userData.rotSpeed.y * dt;
+    });
+
+    // 2. Анимация Домика Элли
+    if (houseState === 'ORBITING') {
+      const orbitSpeed = (2.5 * tornadoSpeedMult) * dt;
+      const hAngle = elapsed * 2.2 * tornadoSpeedMult;
+      const orbitR = 1.48;
+      const bobY = Math.sin(elapsed * 4.2) * 0.16;
+
+      houseGroup.position.set(
+        TORNADO_ORIGIN.x + Math.cos(hAngle) * orbitR,
+        2.25 + bobY,
+        TORNADO_ORIGIN.z + Math.sin(hAngle) * orbitR
+      );
+
+      houseGroup.rotation.y = -hAngle + Math.PI / 4;
+      houseGroup.rotation.z = Math.sin(elapsed * 4.8) * 0.28 + 0.18;
+      houseGroup.rotation.x = Math.cos(elapsed * 4.2) * 0.22;
+
+      // Ставни качаются от ветра
+      houseShutters.forEach(sh => {
+        sh.rotation.y = Math.sin(elapsed * 16 + sh.userData.phase) * 0.45 * sh.userData.side;
+      });
+
+    } else if (houseState === 'LAUNCHING') {
+      // Баллистический полёт на домик Злой Ведьмы
+      const p = Math.min(1.0, (time - houseFlight.startTime) / houseFlight.duration);
+      const easeOut = 1 - Math.pow(1 - p, 2);
+
+      houseGroup.position.x = THREE.MathUtils.lerp(houseFlight.startPos.x, houseFlight.targetPos.x, easeOut);
+      houseGroup.position.z = THREE.MathUtils.lerp(houseFlight.startPos.z, houseFlight.targetPos.z, easeOut);
+
+      // Параболическая траектория
+      const linearY = THREE.MathUtils.lerp(houseFlight.startPos.y, houseFlight.targetPos.y, p * p);
+      const arcLift = Math.sin(p * Math.PI) * 2.2;
+      houseGroup.position.y = linearY + arcLift;
+
+      // Вращение и выравнивание
+      houseGroup.rotation.y = houseFlight.startRot.y + p * Math.PI * 2.5;
+      houseGroup.rotation.x = THREE.MathUtils.lerp(houseFlight.startRot.x, 0, easeOut);
+      houseGroup.rotation.z = THREE.MathUtils.lerp(houseFlight.startRot.z, 0, easeOut);
+
+      if (p >= 1.0) onHouseLanded();
+
+    } else if (houseState === 'LANDED') {
+      // Упругий мультяшный отскок (Squash & Stretch)
+      if (houseBouncePhase < 1.0) {
+        houseBouncePhase += dt * 2.5;
+        const b = houseBouncePhase;
+        const damping = Math.exp(-4.5 * b);
+
+        const bounceY = Math.abs(Math.sin(b * Math.PI * 3.0)) * 0.32 * damping;
+        houseGroup.position.y = WITCH_LANDING.y + bounceY;
+
+        const squash = Math.sin(b * Math.PI * 6.0) * 0.16 * damping;
+        houseGroup.scale.set(1 + squash, 1 - squash, 1 + squash);
+
+        // Домик ведьмы сминается под домом
+        witchSquash = Math.max(0.12, 1.0 - b * 1.6);
+        if (witchCottageGroup) witchCottageGroup.scale.set(1.15, witchSquash, 1.15);
+
+        // Выдвигаем ножки ведьмы с серебряными туфельками
+        legsSlide = Math.min(1.0, b * 1.8);
+        if (witchLegsGroup) {
+          witchLegsGroup.position.z = WITCH_LANDING.z + 0.12 + legsSlide * 0.38;
+        }
+      } else {
+        houseGroup.position.copy(WITCH_LANDING);
+        houseGroup.scale.setScalar(1.0);
+        if (witchCottageGroup) witchCottageGroup.scale.set(1.15, 0.12, 1.15);
+      }
+
+      // Звёздочки вокруг туфелек
+      if (starSparklesPoints && starSparklesPoints.material.opacity > 0) {
+        const sPos = starSparklesPoints.geometry.attributes.position.array;
+        for (let i = 0; i < starSparkleData.length; i++) {
+          const sd = starSparkleData[i];
+          sPos[i * 3 + 1] = sd.basePos.y + Math.sin(elapsed * sd.speed + sd.phase) * 0.15;
+        }
+        starSparklesPoints.geometry.attributes.position.needsUpdate = true;
+      }
+    }
+
+    // 3. Обновление клубов пыли
+    dustBurstPuffs.forEach(p => {
+      if (!p.visible) return;
+      p.userData.life += dt;
+      const prog = p.userData.life / p.userData.maxLife;
+      if (prog >= 1.0) { p.visible = false; return; }
+      p.position.addScaledVector(p.userData.vel, dt);
+      p.userData.vel.y -= 2.6 * dt;
+      p.scale.setScalar((1.0 - prog * 0.45) * 1.1);
+      p.material.opacity = (1.0 - prog) * 0.85;
+    });
+
+    // 4. Отрисовка неонового шлейфа свайпа
+    drawSwipeTrail();
+
+    // 5. Рендеринг 3D-сцены
+    tRenderer.render(tScene, tCamera);
+  }
+
+  function drawSwipeTrail() {
+    if (!swipeCanvasCtx || !swipeTrailEl) return;
+    swipeCanvasCtx.clearRect(0, 0, swipeTrailEl.width, swipeTrailEl.height);
+
+    const now = performance.now();
+    swipeTrailPoints = swipeTrailPoints.filter(pt => now - pt.time < 220);
+    if (swipeTrailPoints.length < 2) return;
+
+    swipeCanvasCtx.save();
+    swipeCanvasCtx.lineCap = 'round';
+    swipeCanvasCtx.lineJoin = 'round';
+
+    for (let i = 1; i < swipeTrailPoints.length; i++) {
+      const p0 = swipeTrailPoints[i - 1];
+      const p1 = swipeTrailPoints[i];
+      const alpha = i / swipeTrailPoints.length;
+      swipeCanvasCtx.beginPath();
+      swipeCanvasCtx.moveTo(p0.x, p0.y);
+      swipeCanvasCtx.lineTo(p1.x, p1.y);
+      swipeCanvasCtx.strokeStyle = `rgba(0, 255, 162, ${alpha * 0.9})`;
+      swipeCanvasCtx.lineWidth = alpha * 9;
+      swipeCanvasCtx.shadowColor = '#00ffa2';
+      swipeCanvasCtx.shadowBlur = 12;
+      swipeCanvasCtx.stroke();
+    }
+    swipeCanvasCtx.restore();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  SCENE 2 — EMERALD CITY REVEAL → AUTO-ROTATE → HEROES WALK
+  // ═══════════════════════════════════════════════════════
+  function startScene2(){
+    S.scene=2;
+    badge.textContent='🏰 Сцена 2 — Изумрудный Город';
+    world.style.display='block';
+    setYaw(0); // looking at city
+
+    sfx.chime();
+
+    // Animate city rising
+    requestAnimationFrame(()=>{
+      setTimeout(()=>{ cityImg.classList.add('visible'); },50);
+    });
+
+    // After 2.5 s — auto-rotate virtual camera 180° to look at road behind
+    setTimeout(()=>{
+      badge.textContent='🛤 Сцена 2 — Оглядываемся назад…';
+      // cinematic 180° pan: 1.8 seconds
+      rotateTo(180, 1800, ()=>{
+        badge.textContent='🛤 Сцена 2 — Герои идут по дороге';
+        startHeroWalk();
+      });
+    }, 2500);
+  }
+
+  // ─── HERO WALK ───────────────────────────────────────
+  // ─── HERO WALK ───────────────────────────────────────
+  // Герои идут по Дороге из жёлтого кирпича от линии горизонта до зрителя
+  const WALK_DURATION_MS = 9500;  // 9.5 секунд реалистичного шествия
+  const SCALE_START = 0.065;      // Крохотные фигурки на горизонте
+  const SCALE_END   = 1.0;        // Приближаются вплотную к зрителю
+  const SCENE3_TRIGGER = 0.88;    // Момент, когда подошли близко
+
+  let heroWalkRAF=null, walkStartTime=null;
+  let scene3Triggered=false;
+  let lastStepSoundTime=0;
+  let horizonY = 280;
+
+  function startHeroWalk(){
+    S.heroWalkActive=true;
+    scene3Triggered=false;
+
+    // Вычисляем реальную высоту горизонта дороги
+    const roadRect = roadImg ? roadImg.getBoundingClientRect() : null;
+    const roadHeight = (roadRect && roadRect.height > 100) ? roadRect.height : (window.innerHeight * 0.48);
+    // В road.svg горизонт находится на высоте ~81% от низа дороги
+    horizonY = Math.round(roadHeight * 0.81);
+
+    // Включаем активную пошаговую анимацию для каждого персонажа
+    heroes.querySelectorAll('.hero').forEach(h => h.classList.add('walking'));
+
+    // Начальная позиция: далеко на горизонте дороги, легкая атмосферная дымка
+    heroes.style.opacity='0.75';
+    heroes.style.transform=`translateX(-50%) translateY(${-horizonY}px) scale(${SCALE_START})`;
+    bubble.style.opacity='0';
+    bubble.textContent='Идём в Изумрудный Город! ✨';
+
+    walkStartTime=performance.now();
+    lastStepSoundTime=walkStartTime;
+    heroWalkRAF=requestAnimationFrame(heroWalkStep);
+  }
+
+  function heroWalkStep(t){
+    if(!S.heroWalkActive) return;
+    const elapsed = t - walkStartTime;
+    const rawP = Math.min(elapsed / WALK_DURATION_MS, 1.0);
+
+    // Перспективная кривая движения по прямой дороге к зрителю:
+    // Вдали объекты движутся визуально медленно и делают много шагов на горизонте,
+    // а по мере приближения их видимый размер и скорость плавно нарастают
+    const u = rawP / (rawP + (1.0 - rawP) * 3.0);
+
+    // Вертикальное смещение: от линии горизонта (-horizonY) вниз к переднему плану (-14px)
+    const currentY = -horizonY * (1.0 - u) - 14.0 * u;
+
+    // Масштаб: от крохотного на горизонте до натурального размера вблизи
+    const currentScale = SCALE_START + (SCALE_END - SCALE_START) * u;
+
+    // Естественное покачивание компании при ходьбе из стороны в сторону
+    const swayX = Math.sin(rawP * 24.0) * (4.0 * u + 1.2);
+
+    // Применение трансформации
+    heroes.style.transform = `translateX(calc(-50% + ${swayX.toFixed(1)}px)) translateY(${currentY.toFixed(1)}px) scale(${currentScale.toFixed(4)})`;
+
+    // Атмосферная глубина: на горизонте легкая дымка, вблизи полная четкость
+    const depthOpacity = Math.min(0.75 + u * 0.35, 1.0);
+    heroes.style.opacity = depthOpacity.toFixed(2);
+
+    // Речевое облачко появляется на середине пути, когда герои уже хорошо видны
+    if(u >= 0.45 && bubble.style.opacity !== '1' && !scene3Triggered){
+      bubble.style.opacity = '1';
+    }
+
+    // Звуки шагов по золотому кирпичу (каждые ~340мс)
+    if(t - lastStepSoundTime > 340){
+      lastStepSoundTime = t;
+      const stepVol = 0.03 + 0.14 * u; // тихие шаги вдалеке, звонкие вблизи
+      sfx.step(stepVol);
+    }
+
+    // Триггер перехода к 3 сцене, когда подошли близко
+    if(!scene3Triggered && u >= SCENE3_TRIGGER){
+      scene3Triggered = true;
+      onHeroesArrived(currentY, currentScale);
+      return;
+    }
+
+    if(rawP < 1.0){
+      heroWalkRAF = requestAnimationFrame(heroWalkStep);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  SCENE 3 — ROTATE BACK → HEROES ENTER CITY
+  // ═══════════════════════════════════════════════════════
+  function onHeroesArrived(finalY, finalScale){
+    S.heroWalkActive=false;
+    S.scene=3;
+    sfx.chime();
+
+    // Останавливаем активную ходьбу (персонажи останавливаются)
+    heroes.querySelectorAll('.hero').forEach(h => h.classList.remove('walking'));
+
+    // Реплика прибытия
+    bubble.textContent='Вот он — Изумрудный Город! 🏰✨';
+
+    badge.textContent='🏰 Сцена 3 — Поворачиваемся к Городу…';
+
+    const y = (finalY !== undefined) ? finalY : -14;
+    const sc = (finalScale !== undefined) ? finalScale : 1.0;
+    heroes.style.transform=`translateX(-50%) translateY(${y.toFixed(1)}px) scale(${sc.toFixed(4)})`;
+
+    // Пауза 1.2 с, затем кинематографичный разворот на 0° к Городу
+    setTimeout(()=>{
+      bubble.style.opacity='0';
+      rotateTo(0, 2000, ()=>{
+        badge.textContent='✨ Сцена 3 — Герои входят в Город!';
+        doFlash('#00ffa2', 350);
+        sfx.tada();
+        setTimeout(heroesEnterCity, 500);
+      });
+    }, 1200);
+  }
+
+  function heroesEnterCity(){
+    // Show hero group on the city front view
+    const s3 = $('scene3-heroes');
+    s3.style.display='flex';
+    s3.querySelectorAll('.hero-s3').forEach(h => h.classList.add('walking'));
+
+    // Small delay then animate them walking into the gate (scale down toward distance)
+    setTimeout(()=>{
+      s3.classList.add('walk-in');
+
+      // Flash at the end = they've entered
+      setTimeout(()=>{
+        doFlash('#c8ffec', 500);
+        sfx.chime();
+        badge.textContent='🎉 Добро пожаловать в Изумрудный Город!';
+        badge.style.boxShadow='0 0 24px rgba(0,255,162,.75)';
+        badge.style.transition='box-shadow 1s ease';
+        s3.querySelectorAll('.hero-s3').forEach(h => h.classList.remove('walking'));
+      }, 4200);
+
+    }, 300);
+  }
+
+  // ─── BOOT ────────────────────────────────────────────
+  async function boot() {
+    // Инициализация 3D сцены (Афиша, поляна, ураган, домик)
+    try {
+      initThreeScene1();
+    } catch(err) {
+      console.error('Three.js init error:', err);
+    }
+
+    if (!isSecureConnection()) {
+      if (httpsModal) httpsModal.style.display = 'flex';
+    } else {
+      // Попробуем тихий запуск, если разрешение уже было выдано
+      const ok = await startCamera({ silent: true });
+      if (!ok && cameraGate) {
+        cameraGate.style.display = 'flex';
+      }
+    }
+  }
+  boot();
+
+  })();
+  </script>
+</body>
+</html>

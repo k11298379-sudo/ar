@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450">
+  <defs>
+    <radialGradient id="glowCenter" cx="50%" cy="75%" r="50%">
+      <stop offset="0%"   stop-color="rgba(0,255,140,0.35)"/>
+      <stop offset="60%"  stop-color="rgba(0,180,90,0.15)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <linearGradient id="groundFog" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="rgba(0,40,25,0)"/>
+      <stop offset="70%"  stop-color="rgba(0,35,20,0.7)"/>
+      <stop offset="100%" stop-color="rgba(0,20,10,0.95)"/>
+    </linearGradient>
+    <filter id="cityGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="winGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Emerald atmosphere aura behind the city (transparent at top for AR camera) -->
+  <rect x="0" y="50" width="800" height="400" fill="url(#glowCenter)"/>
+
+  <!-- Far silhouette background towers -->
+  <g fill="#021f14" opacity="0.85">
+    <rect x="30"  y="210" width="55"  height="240"/>
+    <polygon points="30,210 57,170 85,210"/>
+    <rect x="105" y="230" width="45"  height="220"/>
+    <polygon points="105,230 127,195 150,230"/>
+    <rect x="650" y="210" width="55"  height="240"/>
+    <polygon points="650,210 677,168 705,210"/>
+    <rect x="715" y="235" width="50"  height="215"/>
+    <polygon points="715,235 740,195 765,235"/>
+  </g>
+
+  <!-- Mid towers with dark emerald green -->
+  <g fill="#043321">
+    <rect x="90"  y="170" width="80"  height="280"/>
+    <polygon points="90,170 130,120 170,170" fill="#00ff88" opacity="0.8"/>
+    <rect x="180" y="140" width="70"  height="310"/>
+    <polygon points="180,140 215,90 250,140" fill="#00e676" opacity="0.85"/>
+    <rect x="255" y="180" width="55"  height="270"/>
+    <polygon points="255,180 282,135 310,180" fill="#00ff88" opacity="0.75"/>
+
+    <rect x="490" y="180" width="55"  height="270"/>
+    <polygon points="490,180 517,135 545,180" fill="#00ff88" opacity="0.75"/>
+    <rect x="550" y="140" width="75"  height="310"/>
+    <polygon points="550,140 587,90 625,140" fill="#00e676" opacity="0.85"/>
+    <rect x="630" y="170" width="70"  height="280"/>
+    <polygon points="630,170 665,120 700,170" fill="#00ff88" opacity="0.8"/>
+  </g>
+
+  <!-- Main grand central castle & crystal spire -->
+  <g fill="#07472e">
+    <rect x="300" y="110" width="200" height="340"/>
+    <!-- Castle spires -->
+    <rect x="375" y="40" width="50" height="90" fill="#085738"/>
+    <polygon points="360,50 400,0 440,50" fill="#00ffa2" filter="url(#cityGlow)"/>
+    <polygon points="375,40 400,5 425,40" fill="#a7ffeb"/>
+
+    <!-- Left & right spires on main castle -->
+    <rect x="310" y="80" width="30" height="60" fill="#085738"/>
+    <polygon points="305,80 325,45 345,80" fill="#00e676"/>
+    <rect x="460" y="80" width="30" height="60" fill="#085738"/>
+    <polygon points="455,80 475,45 495,80" fill="#00e676"/>
+
+    <!-- Battlements -->
+    <rect x="300" y="105" width="22" height="15"/>
+    <rect x="330" y="105" width="22" height="15"/>
+    <rect x="360" y="105" width="22" height="15"/>
+    <rect x="390" y="105" width="22" height="15"/>
+    <rect x="420" y="105" width="22" height="15"/>
+    <rect x="450" y="105" width="22" height="15"/>
+    <rect x="478" y="105" width="22" height="15"/>
+  </g>
+
+  <!-- Glowing emerald windows -->
+  <g fill="#00ff9d" filter="url(#winGlow)">
+    <rect x="325" y="135" width="16" height="24" rx="8"/>
+    <rect x="355" y="135" width="16" height="24" rx="8"/>
+    <rect x="385" y="135" width="16" height="24" rx="8"/>
+    <rect x="415" y="135" width="16" height="24" rx="8"/>
+    <rect x="445" y="135" width="16" height="24" rx="8"/>
+
+    <rect x="325" y="175" width="16" height="24" rx="8"/>
+    <rect x="355" y="175" width="16" height="24" rx="8"/>
+    <rect x="385" y="175" width="16" height="24" rx="8"/>
+    <rect x="415" y="175" width="16" height="24" rx="8"/>
+    <rect x="445" y="175" width="16" height="24" rx="8"/>
+
+    <rect x="325" y="215" width="16" height="24" rx="8"/>
+    <rect x="355" y="215" width="16" height="24" rx="8"/>
+    <rect x="385" y="215" width="16" height="24" rx="8"/>
+    <rect x="415" y="215" width="16" height="24" rx="8"/>
+    <rect x="445" y="215" width="16" height="24" rx="8"/>
+
+    <!-- High spire windows -->
+    <circle cx="400" cy="30" r="5" fill="#e0fff4"/>
+    <rect x="393" y="65" width="14" height="20" rx="7"/>
+  </g>
+
+  <!-- Side towers glowing windows -->
+  <g fill="#69f0ae" opacity="0.8" filter="url(#winGlow)">
+    <rect x="110" y="190" width="12" height="18" rx="6"/><rect x="135" y="190" width="12" height="18" rx="6"/>
+    <rect x="110" y="225" width="12" height="18" rx="6"/><rect x="135" y="225" width="12" height="18" rx="6"/>
+    <rect x="200" y="165" width="12" height="18" rx="6"/><rect x="225" y="165" width="12" height="18" rx="6"/>
+    <rect x="200" y="200" width="12" height="18" rx="6"/><rect x="225" y="200" width="12" height="18" rx="6"/>
+
+    <rect x="565" y="165" width="12" height="18" rx="6"/><rect x="590" y="165" width="12" height="18" rx="6"/>
+    <rect x="565" y="200" width="12" height="18" rx="6"/><rect x="590" y="200" width="12" height="18" rx="6"/>
+    <rect x="645" y="190" width="12" height="18" rx="6"/><rect x="670" y="190" width="12" height="18" rx="6"/>
+  </g>
+
+  <!-- The Grand City Gates (where heroes enter) -->
+  <g id="city-gate">
+    <!-- Outer arch glowing outline -->
+    <path d="M 345,450 L 345,340 C 345,280 455,280 455,340 L 455,450 Z"
+          fill="#02140c" stroke="#00ffa2" stroke-width="4" filter="url(#winGlow)"/>
+    <!-- Gate interior mystical green glow portal -->
+    <path d="M 355,450 L 355,345 C 355,295 445,295 445,345 L 445,450 Z"
+          fill="rgba(0, 255, 140, 0.45)"/>
+    <!-- Inner bright light beam -->
+    <polygon points="400,310 370,450 430,450" fill="rgba(200, 255, 230, 0.6)" filter="url(#winGlow)"/>
+  </g>
+
+  <!-- Ground base blend (transparent gradient at bottom) -->
+  <rect x="0" y="380" width="800" height="70" fill="url(#groundFog)"/>
+</svg>

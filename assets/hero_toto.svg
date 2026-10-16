@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">
+  <!-- Little black dog Toto -->
+  <defs>
+    <radialGradient id="totoGrad" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#3a3a3a"/>
+      <stop offset="100%" stop-color="#141414"/>
+    </radialGradient>
+  </defs>
+  <!-- Tail -->
+  <path d="M 12 36 Q 4 30 6 22 Q 10 24 14 32" fill="#141414"/>
+  <!-- Paws -->
+  <ellipse cx="20" cy="54" rx="4" ry="3" fill="#111"/>
+  <ellipse cx="28" cy="54" rx="4" ry="3" fill="#111"/>
+  <ellipse cx="40" cy="54" rx="4" ry="3" fill="#111"/>
+  <ellipse cx="48" cy="54" rx="4" ry="3" fill="#111"/>
+  <!-- Legs -->
+  <rect x="18" y="44" width="5" height="10" rx="2" fill="#1c1c1c"/>
+  <rect x="26" y="44" width="5" height="10" rx="2" fill="#1c1c1c"/>
+  <rect x="38" y="44" width="5" height="10" rx="2" fill="#1c1c1c"/>
+  <rect x="46" y="44" width="5" height="10" rx="2" fill="#1c1c1c"/>
+  <!-- Body -->
+  <ellipse cx="32" cy="40" rx="16" ry="11" fill="url(#totoGrad)"/>
+  <!-- Head -->
+  <ellipse cx="46" cy="28" rx="10" ry="9" fill="url(#totoGrad)"/>
+  <!-- Snout -->
+  <ellipse cx="54" cy="30" rx="5" ry="4" fill="#1f1f1f"/>
+  <circle cx="57" cy="29" r="1.8" fill="#000"/>
+  <!-- Red collar -->
+  <ellipse cx="42" cy="34" rx="6" ry="2.5" fill="#e63946"/>
+  <!-- Ears -->
+  <polygon points="41,20 46,14 48,22" fill="#141414"/>
+  <polygon points="47,20 52,14 54,22" fill="#141414"/>
+  <!-- Eye -->
+  <circle cx="49" cy="26" r="1.8" fill="#fff"/>
+  <circle cx="50" cy="26" r="1.1" fill="#000"/>
+  <!-- Shaggy fur highlights -->
+  <path d="M 22 36 L 24 39 M 28 34 L 30 38 M 34 35 L 36 39 M 44 26 L 43 29" stroke="#444" stroke-width="1.2" stroke-linecap="round"/>
+</svg>
