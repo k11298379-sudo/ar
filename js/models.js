@@ -6,8 +6,8 @@
   'use strict';
 
   // Константы позиционирования для MR
-  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 0.05, -0.25); // глубина внутри афиши
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.42, 0.65); // вырывается вперед в комнату к пользователю (+Z)
+  const TORNADO_POSTER_POS   = new THREE.Vector3(0.14, -0.40, -0.85); // зарождается у домика Ведьмы в глубине портала
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.42, -1.25); // вырывается вперед в комнату перед зрителем
   const TORNADO_BASE_SCALE   = 0.44; // базовый масштаб вихря (~1.1м высота)
 
   window.TORNADO_POSTER_POS   = TORNADO_POSTER_POS;
@@ -16,7 +16,8 @@
 
   // Текстуры
   let woodPlankTexture, roofShingleTexture, stoneWallTexture, cloudAlphaTexture,
-      posterTexture, witchRoofTexture, stripesTexture, floorAbrasionTexture;
+      posterTexture, witchRoofTexture, stripesTexture, floorAbrasionTexture,
+      fairytaleSkyTexture, grassMeadowTexture, yellowBrickTexture;
 
   // 3D-объекты сцены
   let posterGroup, posterMesh, clearingGroup;
@@ -234,6 +235,116 @@
     }
     floorAbrasionTexture = new THREE.CanvasTexture(abrC);
 
+    // 9. Небо Волшебной страны Оз (градиент, облака, холмы и башни Изумрудного Города)
+    const skyC = document.createElement('canvas');
+    skyC.width = 1024; skyC.height = 512;
+    const skCtx = skyC.getContext('2d');
+    const skGrad = skCtx.createLinearGradient(0, 0, 0, 512);
+    skGrad.addColorStop(0, '#0284c7');    // лазурный зенит
+    skGrad.addColorStop(0.35, '#38bdf8'); // яркая бирюза
+    skGrad.addColorStop(0.65, '#bae6fd'); // нежно-голубой
+    skGrad.addColorStop(0.85, '#fed7aa'); // персиковое утро
+    skGrad.addColorStop(1.0, '#fef08a');  // золотистый горизонт
+    skCtx.fillStyle = skGrad;
+    skCtx.fillRect(0, 0, 1024, 512);
+
+    // Мягкие сказочные облака
+    function drawSkyCloud(cx, cy, r, alpha) {
+      skCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      for (let c = 0; c < 7; c++) {
+        const ox = (c - 3) * (r * 0.45);
+        const oy = Math.sin((c / 6) * Math.PI) * (r * 0.25);
+        const rad = r * (0.6 + Math.sin((c / 6) * Math.PI) * 0.4);
+        skCtx.beginPath();
+        skCtx.arc(cx + ox, cy - oy, rad, 0, Math.PI * 2);
+        skCtx.fill();
+      }
+    }
+    drawSkyCloud(200, 130, 48, 0.75);
+    drawSkyCloud(460, 90, 64, 0.85);
+    drawSkyCloud(760, 150, 52, 0.70);
+    drawSkyCloud(940, 105, 42, 0.65);
+
+    // Дальние изумрудные холмы на горизонте
+    skCtx.fillStyle = '#065f46';
+    skCtx.beginPath();
+    skCtx.moveTo(0, 512);
+    for (let x = 0; x <= 1024; x += 16) {
+      const y = 430 + Math.sin(x * 0.008) * 35 + Math.sin(x * 0.02) * 15;
+      skCtx.lineTo(x, y);
+    }
+    skCtx.lineTo(1024, 512);
+    skCtx.closePath();
+    skCtx.fill();
+
+    // Силуэты шпилей Изумрудного Города на горизонте
+    const cityCenter = 512;
+    const spires = [
+      { x: -55, w: 14, h: 65 }, { x: -35, w: 18, h: 95 }, { x: -12, w: 24, h: 135 },
+      { x: 12, w: 22, h: 115 }, { x: 38, w: 16, h: 85 }, { x: 55, w: 12, h: 55 }
+    ];
+    spires.forEach(sp => {
+      const sx = cityCenter + sp.x;
+      const sy = 415 - sp.h;
+      skCtx.fillStyle = '#047857';
+      skCtx.fillRect(sx, sy, sp.w, sp.h + 50);
+      skCtx.beginPath();
+      skCtx.moveTo(sx - 3, sy);
+      skCtx.lineTo(sx + sp.w / 2, sy - 30);
+      skCtx.lineTo(sx + sp.w + 3, sy);
+      skCtx.closePath();
+      skCtx.fillStyle = '#10b981';
+      skCtx.fill();
+      // Золотой шпиль
+      skCtx.fillStyle = '#fbbf24';
+      skCtx.fillRect(sx + sp.w / 2 - 1.5, sy - 42, 3, 14);
+    });
+    fairytaleSkyTexture = new THREE.CanvasTexture(skyC);
+
+    // 10. Сочная сказочная трава с цветами
+    const grassC = document.createElement('canvas');
+    grassC.width = 512; grassC.height = 512;
+    const gCtx = grassC.getContext('2d');
+    gCtx.fillStyle = '#15803d';
+    gCtx.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 2200; i++) {
+      const gx = Math.random() * 512, gy = Math.random() * 512;
+      gCtx.fillStyle = Math.random() > 0.5 ? '#16a34a' : (Math.random() > 0.5 ? '#22c55e' : '#14532d');
+      gCtx.fillRect(gx, gy, 3 + Math.random() * 4, 3 + Math.random() * 4);
+    }
+    const flColors = ['#ef4444', '#f59e0b', '#fbbf24', '#ffffff', '#38bdf8'];
+    for (let f = 0; f < 350; f++) {
+      const fx = Math.random() * 512, fy = Math.random() * 512;
+      gCtx.fillStyle = flColors[f % flColors.length];
+      gCtx.beginPath();
+      gCtx.arc(fx, fy, 2.5 + Math.random() * 2, 0, Math.PI * 2);
+      gCtx.fill();
+    }
+    grassMeadowTexture = new THREE.CanvasTexture(grassC);
+    grassMeadowTexture.wrapS = grassMeadowTexture.wrapT = THREE.RepeatWrapping;
+    grassMeadowTexture.repeat.set(3, 3);
+
+    // 11. Дорога из жёлтого кирпича
+    const ybC = document.createElement('canvas');
+    ybC.width = 512; ybC.height = 256;
+    const ybCtx = ybC.getContext('2d');
+    ybCtx.fillStyle = '#854d0e';
+    ybCtx.fillRect(0, 0, 512, 256);
+    const bRows = 8, bCols = 8, bH = 256 / bRows, bW = 512 / bCols;
+    for (let r = 0; r < bRows; r++) {
+      const offset = (r % 2) * (bW * 0.5);
+      for (let c = -1; c <= bCols; c++) {
+        const v = Math.floor(Math.random() * 24 - 12);
+        ybCtx.fillStyle = `rgb(${250 + v}, ${204 + v}, ${21 + v})`;
+        ybCtx.fillRect(c * bW + offset + 2, r * bH + 2, bW - 4, bH - 4);
+        ybCtx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ybCtx.fillRect(c * bW + offset + 4, r * bH + 4, bW - 8, 4);
+      }
+    }
+    yellowBrickTexture = new THREE.CanvasTexture(ybC);
+    yellowBrickTexture.wrapS = yellowBrickTexture.wrapT = THREE.RepeatWrapping;
+    yellowBrickTexture.repeat.set(1, 5);
+
     window.woodPlankTexture = woodPlankTexture;
     window.roofShingleTexture = roofShingleTexture;
     window.stoneWallTexture = stoneWallTexture;
@@ -242,6 +353,9 @@
     window.witchRoofTexture = witchRoofTexture;
     window.stripesTexture = stripesTexture;
     window.floorAbrasionTexture = floorAbrasionTexture;
+    window.fairytaleSkyTexture = fairytaleSkyTexture;
+    window.grassMeadowTexture = grassMeadowTexture;
+    window.yellowBrickTexture = yellowBrickTexture;
   }
 
   // ─── 3D-ДИОРАМА ПОРТАЛА АФИШИ И СКАЗОЧНАЯ ПОЛЯНА ─────────
@@ -253,12 +367,12 @@
     posterGroup.rotation.set(0, 0, 0);
     posterGroup.visible = false;
 
-    // Внешняя золотая рама афиши: ширина 1.02, высота 1.48 (соответствует афише MindAR)
+    // 1. Внешняя золотая рама афиши (1.02 x 1.48 — точно по размеру афиши MindAR)
     const frameW = 1.02, frameH = 1.48, frameD = 0.04, borderThick = 0.05;
     const goldMat = new THREE.MeshStandardMaterial({
       color: 0xd4af37,
       metalness: 0.88,
-      roughness: 0.25
+      roughness: 0.22
     });
 
     const hBarGeo = new THREE.BoxGeometry(frameW, borderThick, frameD);
@@ -279,194 +393,222 @@
     rightBar.position.set(frameW / 2 - borderThick / 2, 0, frameD / 2);
     posterGroup.add(rightBar);
 
-    // Внутренние стенки глубины портала
-    const recessDepth = 0.22;
+    // 2. Каменный свод портала, врезающийся вглубь стены (от Z=0 до Z=-0.45)
+    const archDepth = 0.45;
     const innerW = frameW - borderThick * 2;
     const innerH = frameH - borderThick * 2;
-    const portalWallMat = new THREE.MeshStandardMaterial({
-      color: 0x052e16,
-      roughness: 0.85,
+    const portalStoneMat = new THREE.MeshStandardMaterial({
+      map: stoneWallTexture,
+      roughness: 0.88,
       side: THREE.DoubleSide
     });
 
-    const leftWallGeo = new THREE.PlaneGeometry(recessDepth, innerH);
+    // Левая каменная стена
+    const leftWallGeo = new THREE.PlaneGeometry(archDepth, innerH);
     leftWallGeo.rotateY(Math.PI / 2);
-    const leftWall = new THREE.Mesh(leftWallGeo, portalWallMat);
-    leftWall.position.set(-innerW / 2, 0, -recessDepth / 2);
+    const leftWall = new THREE.Mesh(leftWallGeo, portalStoneMat);
+    leftWall.position.set(-innerW / 2, 0, -archDepth / 2);
     posterGroup.add(leftWall);
 
-    const rightWallGeo = new THREE.PlaneGeometry(recessDepth, innerH);
+    // Правая каменная стена
+    const rightWallGeo = new THREE.PlaneGeometry(archDepth, innerH);
     rightWallGeo.rotateY(-Math.PI / 2);
-    const rightWall = new THREE.Mesh(rightWallGeo, portalWallMat);
-    rightWall.position.set(innerW / 2, 0, -recessDepth / 2);
+    const rightWall = new THREE.Mesh(rightWallGeo, portalStoneMat);
+    rightWall.position.set(innerW / 2, 0, -archDepth / 2);
     posterGroup.add(rightWall);
 
-    const topWallGeo = new THREE.PlaneGeometry(innerW, recessDepth);
-    topWallGeo.rotateX(Math.PI / 2);
-    const topWall = new THREE.Mesh(topWallGeo, portalWallMat);
-    topWall.position.set(0, innerH / 2, -recessDepth / 2);
-    posterGroup.add(topWall);
+    // Верхний каменный свод
+    const topArchGeo = new THREE.PlaneGeometry(innerW, archDepth);
+    topArchGeo.rotateX(Math.PI / 2);
+    const topArch = new THREE.Mesh(topArchGeo, portalStoneMat);
+    topArch.position.set(0, innerH / 2, -archDepth / 2);
+    posterGroup.add(topArch);
 
-    const btmWallGeo = new THREE.PlaneGeometry(innerW, recessDepth);
-    btmWallGeo.rotateX(-Math.PI / 2);
-    const btmWall = new THREE.Mesh(btmWallGeo, portalWallMat);
-    btmWall.position.set(0, -innerH / 2, -recessDepth / 2);
-    posterGroup.add(btmWall);
+    // Нижний порог
+    const btmSillGeo = new THREE.PlaneGeometry(innerW, archDepth);
+    btmSillGeo.rotateX(-Math.PI / 2);
+    const btmSill = new THREE.Mesh(btmSillGeo, portalStoneMat);
+    btmSill.position.set(0, -innerH / 2, -archDepth / 2);
+    posterGroup.add(btmSill);
 
-    // Заднее полотно афиши
-    const backGeo = new THREE.PlaneGeometry(innerW, innerH);
-    const backMat = new THREE.MeshStandardMaterial({
-      map: posterTexture,
-      roughness: 0.65,
-      side: THREE.FrontSide
-    });
-    posterMesh = new THREE.Mesh(backGeo, backMat);
-    posterMesh.position.set(0, 0, -recessDepth);
-    posterGroup.add(posterMesh);
-
-    // Подгрузка реального постера poster.png
-    new THREE.TextureLoader().load('poster.png', (tex) => {
-      tex.encoding = THREE.sRGBEncoding;
-      if (posterMesh) {
-        posterMesh.material.map = tex;
-        posterMesh.material.needsUpdate = true;
-      }
-    });
-
-    // Сказочное поле (clearingGroup) внутри афиши
+    // 3. Открытое пространство Волшебной страны Оз (clearingGroup)
     clearingGroup = new THREE.Group();
     clearingGroup.name = "PosterFairytaleMeadow";
-    clearingGroup.position.set(0, 0, -recessDepth + 0.01);
+    clearingGroup.position.set(0, 0, 0);
 
-    const fieldGeo = new THREE.PlaneGeometry(innerW * 0.98, innerH * 0.98);
-    const fieldMat = new THREE.MeshStandardMaterial({
-      color: 0x16a34a,
-      roughness: 0.82,
-      flatShading: true
+    // А) ГОРИЗОНТАЛЬНАЯ ПОЛЯНА (трава на уровне пола, уходит в стену на 2.4 метра!)
+    const meadowGroundY = -innerH / 2; // -0.69
+    const meadowGeo = new THREE.PlaneGeometry(3.6, 2.6, 8, 8);
+    meadowGeo.rotateX(-Math.PI / 2);
+    const meadowMat = new THREE.MeshStandardMaterial({
+      map: grassMeadowTexture,
+      roughness: 0.86,
+      side: THREE.FrontSide
     });
-    const fieldMesh = new THREE.Mesh(fieldGeo, fieldMat);
-    clearingGroup.add(fieldMesh);
+    const meadowMesh = new THREE.Mesh(meadowGeo, meadowMat);
+    meadowMesh.position.set(0, meadowGroundY, -1.35);
+    clearingGroup.add(meadowMesh);
 
-    // Дорожка из жёлтого кирпича
-    const pathGeo = new THREE.PlaneGeometry(0.22, 1.25);
-    const pathMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.72 });
-    const pathMesh = new THREE.Mesh(pathGeo, pathMat);
-    pathMesh.position.set(0.06, -0.25, 0.01);
-    pathMesh.rotation.z = -0.10;
-    clearingGroup.add(pathMesh);
+    // Б) ДОРОГА ИЗ ЖЁЛТОГО КИРПИЧА (лежит на траве и вьется от горизонта прямо к порогу!)
+    const roadGeo = new THREE.PlaneGeometry(0.36, 2.2);
+    roadGeo.rotateX(-Math.PI / 2);
+    const roadMat = new THREE.MeshStandardMaterial({
+      map: yellowBrickTexture,
+      roughness: 0.65
+    });
+    const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+    roadMesh.position.set(0.04, meadowGroundY + 0.005, -1.2);
+    roadMesh.rotation.y = -0.06;
+    clearingGroup.add(roadMesh);
 
-    // Цветы
-    const flowerColors = [0xef4444, 0xfde047, 0x38bdf8, 0xc084fc, 0xffffff];
-    const flowerGeo = new THREE.DodecahedronGeometry(0.016, 0);
-    for (let f = 0; f < 36; f++) {
-      const col = flowerColors[f % flowerColors.length];
-      const flMat = new THREE.MeshBasicMaterial({ color: col });
-      const flower = new THREE.Mesh(flowerGeo, flMat);
-      const fx = (Math.random() - 0.5) * (innerW * 0.86);
-      const fy = (Math.random() - 0.5) * (innerH * 0.86);
-      flower.position.set(fx, fy, 0.015);
-      clearingGroup.add(flower);
-    }
+    // В) СКАЗОЧНОЕ НЕБО ОЗ (панорамный купол в глубине на Z = -2.3 с градиентом, облаками и Изумрудным Городом)
+    const skyGeo = new THREE.CylinderGeometry(2.6, 2.6, 2.8, 28, 1, true, -Math.PI * 0.55, Math.PI * 1.1);
+    const skyMat = new THREE.MeshBasicMaterial({
+      map: fairytaleSkyTexture,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    skyMesh.position.set(0, 0.45, -0.6);
+    clearingGroup.add(skyMesh);
 
-    // Деревца
-    function addPosterTree(x, y, scale = 1.0) {
-      const tg = new THREE.Group();
-      tg.position.set(x, y, 0.01);
+    // Г) 3D-ДЕРЕВЬЯ НА РАЗНОЙ ГЛУБИНЕ (создают мощнейший параллакс глубины в стену)
+    function addMeadow3DTree(x, z, scale = 1.0) {
+      const treeGroup = new THREE.Group();
+      treeGroup.position.set(x, meadowGroundY, z);
+
+      // Ствол
       const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.018 * scale, 0.025 * scale, 0.12 * scale, 6),
-        new THREE.MeshStandardMaterial({ color: 0x5c2d0c, roughness: 0.9 })
+        new THREE.CylinderGeometry(0.024 * scale, 0.038 * scale, 0.24 * scale, 6),
+        new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 })
       );
-      trunk.position.y = 0.06 * scale;
-      tg.add(trunk);
-      const crown = new THREE.Mesh(
-        new THREE.ConeGeometry(0.10 * scale, 0.28 * scale, 7),
-        new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75, flatShading: true })
-      );
-      crown.position.y = 0.20 * scale;
-      crown.castShadow = true;
-      tg.add(crown);
-      clearingGroup.add(tg);
+      trunk.position.y = 0.12 * scale;
+      treeGroup.add(trunk);
+
+      // 3 яруса изумрудной кроны
+      const crownColors = [0x14532d, 0x15803d, 0x22c55e];
+      [
+        { r: 0.18, h: 0.28, y: 0.26 },
+        { r: 0.14, h: 0.24, y: 0.40 },
+        { r: 0.10, h: 0.20, y: 0.52 }
+      ].forEach((tier, tIdx) => {
+        const cMesh = new THREE.Mesh(
+          new THREE.ConeGeometry(tier.r * scale, tier.h * scale, 7),
+          new THREE.MeshStandardMaterial({ color: crownColors[tIdx], roughness: 0.78, flatShading: true })
+        );
+        cMesh.position.y = tier.y * scale;
+        treeGroup.add(cMesh);
+      });
+
+      clearingGroup.add(treeGroup);
     }
-    addPosterTree(-0.35, -0.32, 0.9);
-    addPosterTree(0.35, -0.22, 1.0);
-    addPosterTree(-0.32, 0.42, 0.8);
+
+    // Рассадка деревьев: передний план, средний план, задний план
+    addMeadow3DTree(-0.35, -0.40, 0.85); // впереди слева у входа
+    addMeadow3DTree(0.38, -0.48, 0.90);  // впереди справа
+    addMeadow3DTree(-0.62, -0.92, 1.15); // середина слева
+    addMeadow3DTree(0.65, -1.05, 1.20);  // середина справа
+    addMeadow3DTree(-0.85, -1.55, 1.45); // дальний план слева
+    addMeadow3DTree(0.78, -1.70, 1.40);  // дальний план справа
+
+    // Д) Парящие светлячки / волшебные споры
+    const sparkleCount = 45;
+    const sparkleGeo = new THREE.BufferGeometry();
+    const spPos = new Float32Array(sparkleCount * 3);
+    for (let i = 0; i < sparkleCount; i++) {
+      spPos[i * 3]     = (Math.random() - 0.5) * 1.8;
+      spPos[i * 3 + 1] = meadowGroundY + 0.1 + Math.random() * 0.9;
+      spPos[i * 3 + 2] = -0.3 - Math.random() * 1.5;
+    }
+    sparkleGeo.setAttribute('position', new THREE.BufferAttribute(spPos, 3));
+    const sparkleMat = new THREE.PointsMaterial({
+      color: 0xfef08a,
+      size: 0.035,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+    const sparkleMesh = new THREE.Points(sparkleGeo, sparkleMat);
+    clearingGroup.add(sparkleMesh);
 
     posterGroup.add(clearingGroup);
     if (dioramaGroup) dioramaGroup.add(posterGroup);
 
     window.posterGroup = posterGroup;
-    window.posterMesh = posterMesh;
     window.clearingGroup = clearingGroup;
   }
 
   // ─── ДОМИК ЗЛОЙ ВЕДЬМЫ И СЕРЕБРЯНЫЕ БАШМАЧКИ ─────────
   function createWitchCottage() {
     witchCottageGroup = new THREE.Group();
-    witchCottageGroup.name = "WickedWitchCottage";
-    witchCottageGroup.position.set(0.05, 0.18, 0.04);
+    witchCottageGroup.name = "WickedWickedCottage";
+    // Домик стоит НА ГОРИЗОНТАЛЬНОЙ ТРАВЕ в глубине портала (Y=-0.69, Z=-0.85)!
+    witchCottageGroup.position.set(0.14, -0.69, -0.85);
 
     const witchMatWalls = new THREE.MeshStandardMaterial({ color: 0x3d1a3b, roughness: 0.85 });
     const witchMatRoof  = new THREE.MeshStandardMaterial({ map: witchRoofTexture, roughness: 0.85 });
     const witchMatStone = new THREE.MeshStandardMaterial({ map: stoneWallTexture, roughness: 0.9 });
     const witchGlowMat  = new THREE.MeshStandardMaterial({ color: 0xbef264, emissive: 0x84cc16, emissiveIntensity: 0.95 });
 
-    const foundation = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.28, 0.06), witchMatStone);
-    foundation.position.set(0, 0, 0.03);
+    // Каменный фундамент (на земле)
+    const foundation = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.38), witchMatStone);
+    foundation.position.set(0, 0.04, 0);
     witchCottageGroup.add(foundation);
 
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.20), witchMatWalls);
-    walls.position.set(0, 0, 0.12);
-    walls.rotation.z = -0.06;
+    // Стены домика (деревянные, слегка перекошенные)
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.34), witchMatWalls);
+    walls.position.set(0, 0.24, 0);
+    walls.rotation.y = -0.05;
     witchCottageGroup.add(walls);
 
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.34, 4), witchMatRoof);
-    roof.position.set(0.02, 0.20, 0.16);
-    roof.rotation.y = Math.PI / 4;
-    roof.rotation.z = -0.12;
+    // Коническая высокая крыша Злой Ведьмы
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.46, 8), witchMatRoof);
+    roof.position.set(0, 0.62, 0);
     witchCottageGroup.add(roof);
 
-    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.06), witchMatStone);
-    chimney.position.set(0.10, 0.24, 0.12);
-    chimney.rotation.z = 0.15;
+    // Каменная труба
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.34, 0.08), witchMatStone);
+    chimney.position.set(0.12, 0.58, -0.06);
     witchCottageGroup.add(chimney);
 
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.03), witchGlowMat);
-    win.position.set(0, 0, 0.22);
+    // Светящееся окно ведьмы
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.02), witchGlowMat);
+    win.position.set(0, 0.24, 0.175);
     witchCottageGroup.add(win);
 
     if (clearingGroup) clearingGroup.add(witchCottageGroup);
 
-    // Ножки Ведьмы в полосатых чулках и Серебряные башмачки
+    // Ножки Ведьмы в полосатых чулках и Серебряные башмачки (лежат перед порогом на траве)
     witchLegsGroup = new THREE.Group();
     witchLegsGroup.name = "WitchStripedLegs";
-    witchLegsGroup.position.set(0.05, -0.02, 0.08);
+    witchLegsGroup.position.set(0.14, -0.68, -0.68);
 
     const legMat = new THREE.MeshStandardMaterial({ map: stripesTexture, roughness: 0.65 });
     const shoeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.18 });
     const rubyMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
 
-    [-0.06, 0.06].forEach((lx) => {
+    [-0.07, 0.07].forEach((lx) => {
       const legSub = new THREE.Group();
       legSub.position.set(lx, 0, 0);
 
-      const legGeo = new THREE.CylinderGeometry(0.016, 0.018, 0.16, 12);
-      legGeo.rotateZ(Math.PI / 2);
+      const legGeo = new THREE.CylinderGeometry(0.016, 0.018, 0.18, 12);
+      legGeo.rotateX(Math.PI / 2);
       const legMesh = new THREE.Mesh(legGeo, legMat);
       legSub.add(legMesh);
 
       const shoeGroup = new THREE.Group();
-      shoeGroup.position.set(0, -0.08, 0.02);
+      shoeGroup.position.set(0, 0.01, 0.10);
 
-      const shoeBody = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.07, 0.025), shoeMat);
+      const shoeBody = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.08), shoeMat);
       shoeGroup.add(shoeBody);
 
-      const toeTip = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.04, 8), shoeMat);
-      toeTip.rotation.x = -Math.PI / 3;
-      toeTip.position.set(0, -0.03, 0.025);
+      const toeTip = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.045, 8), shoeMat);
+      toeTip.rotation.x = Math.PI / 2;
+      toeTip.position.set(0, 0, 0.055);
       shoeGroup.add(toeTip);
 
-      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.015, 0.01), rubyMat);
-      buckle.position.set(0, 0.005, 0.02);
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.015, 0.01), rubyMat);
+      buckle.position.set(0, 0.018, 0.02);
       shoeGroup.add(buckle);
 
       legSub.add(shoeGroup);
@@ -482,13 +624,13 @@
 
   // ─── 3D-ВИХРЬ УРАГАНА ─────────────────────────────────
   function createTornado() {
-    const dioramaGroup = window.dioramaGroup;
+    const parentGroup = window.roomTornadoRoot || window.dioramaGroup;
     tornadoGroup = new THREE.Group();
     tornadoGroup.name = "TornadoVortex";
     tornadoGroup.position.copy(TORNADO_POSTER_POS);
     tornadoGroup.scale.setScalar(0.04);
     tornadoGroup.visible = false;
-    if (dioramaGroup) dioramaGroup.add(tornadoGroup);
+    if (parentGroup) parentGroup.add(tornadoGroup);
 
     tornadoRings = [];
     const numSlices = 24;
@@ -566,7 +708,7 @@
     floorContactMesh = new THREE.Mesh(floorContactGeo, floorContactMat);
     floorContactMesh.position.set(tornadoGroup.position.x, TORNADO_ROOM_DEFAULT.y + 0.005, tornadoGroup.position.z);
     floorContactMesh.visible = false;
-    if (dioramaGroup) dioramaGroup.add(floorContactMesh);
+    if (parentGroup) parentGroup.add(floorContactMesh);
 
     // 650 аккуратных частиц вихря (размер 0.045 вместо 0.44!)
     const pCount = 650;
@@ -781,7 +923,8 @@
     cabin.scale.setScalar(0.18);
     houseGroup.add(cabin);
     houseGroup.visible = false;
-    if (dioramaGroup) dioramaGroup.add(houseGroup);
+    const parentGroup = window.roomTornadoRoot || window.dioramaGroup;
+    if (parentGroup) parentGroup.add(houseGroup);
 
     window.houseGroup = houseGroup;
     window.cabin = cabin;

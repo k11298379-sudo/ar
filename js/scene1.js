@@ -112,13 +112,20 @@
     tScene.add(dioramaGroup);
     window.dioramaGroup = dioramaGroup;
 
+    // 3b. Корневая группа урагана в комнате (живет в реальном пространстве комнаты)
+    let roomTornadoRoot = new THREE.Group();
+    roomTornadoRoot.name = "Room_Tornado_Root";
+    roomTornadoRoot.visible = false;
+    tScene.add(roomTornadoRoot);
+    window.roomTornadoRoot = roomTornadoRoot;
+
     vortexLight = new THREE.PointLight(0x38bdf8, 1.5, 4.0);
-    vortexLight.position.set(0, 0.5, 0.2);
-    dioramaGroup.add(vortexLight);
+    vortexLight.position.set(0, 0.5, -1.25);
+    roomTornadoRoot.add(vortexLight);
     window.vortexLight = vortexLight;
 
     const fairyLight = new THREE.PointLight(0x84cc16, 1.2, 2.5);
-    fairyLight.position.set(0.04, 0.25, -0.05);
+    fairyLight.position.set(0.14, -0.40, -0.85);
     dioramaGroup.add(fairyLight);
 
     // 4. Создание текстур и 3D-моделей
@@ -225,9 +232,12 @@
     window.tornadoState = tornadoState;
     eruptionStartTime = performance.now();
 
+    const roomTornadoRoot = window.roomTornadoRoot;
+    if (roomTornadoRoot) roomTornadoRoot.visible = true;
+
     if (window.tornadoGroup) {
       window.tornadoGroup.position.copy(window.TORNADO_POSTER_POS);
-      window.tornadoGroup.scale.setScalar(0.02);
+      window.tornadoGroup.scale.setScalar(0.04);
       window.tornadoGroup.visible = true;
     }
 
@@ -404,7 +414,7 @@
   // ─── ЗАПУСК ДОМИКА И РАССЕИВАНИЕ УРАГАНА ───────────────
   function blowTornadoAndLaunchHouse(dirX = 1) {
     tornadoBlowAway = true;
-    tornadoBlowVel.set(dirX * 6.5, 3.5, -4.5);
+    tornadoBlowVel.set(dirX * 6.5, 3.5, 4.5);
 
     houseState = 'LAUNCHING';
     window.houseState = houseState;
@@ -414,15 +424,18 @@
     const houseGroup = window.houseGroup;
     const witchCottageGroup = window.witchCottageGroup;
     if (houseGroup) {
-      houseFlight.startPos.copy(houseGroup.position);
+      houseGroup.getWorldPosition(houseFlight.startPos);
       houseFlight.startRot.copy(houseGroup.rotation);
+      if (tScene && houseGroup.parent !== tScene) {
+        tScene.attach(houseGroup);
+      }
     }
 
-    if (witchCottageGroup && dioramaGroup) {
+    if (witchCottageGroup) {
       witchCottageGroup.getWorldPosition(houseFlight.targetPos);
-      dioramaGroup.worldToLocal(houseFlight.targetPos);
+      houseFlight.targetPos.y += 0.08;
     } else {
-      houseFlight.targetPos.set(0.05, 0.18, -0.18);
+      houseFlight.targetPos.set(0.14, -0.65, -0.85);
     }
   }
 
@@ -438,6 +451,9 @@
     if (houseGroup) {
       houseGroup.position.copy(houseFlight.targetPos);
       houseGroup.rotation.set(0, 0.12, 0);
+      if (dioramaGroup && houseGroup.parent !== dioramaGroup) {
+        dioramaGroup.attach(houseGroup);
+      }
     }
 
     if (window.sfx) {
@@ -493,6 +509,16 @@
       if (window.posterGroup) window.posterGroup.visible = isVisible;
     }
 
+    // Ураган в комнате: виден ВСЕГДА после вылета, даже если отошли от афиши!
+    const roomTornadoRoot = window.roomTornadoRoot;
+    if (roomTornadoRoot) {
+      if (tornadoState === 'WAITING_FOR_POSTER') {
+        roomTornadoRoot.visible = false;
+      } else {
+        roomTornadoRoot.visible = true;
+      }
+    }
+
     const tornadoGroup = window.tornadoGroup;
     const houseGroup = window.houseGroup;
     const floorContactMesh = window.floorContactMesh;
@@ -524,7 +550,7 @@
 
       if (tornadoGroup) {
         tornadoGroup.position.lerpVectors(window.TORNADO_POSTER_POS, window.TORNADO_ROOM_DEFAULT, ease);
-        tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.32;
+        tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.45;
         const currentScale = THREE.MathUtils.lerp(0.04, window.TORNADO_BASE_SCALE, ease);
         tornadoGroup.scale.setScalar(currentScale);
         tornadoGroup.rotation.y += dt * 14.0;
@@ -562,14 +588,28 @@
       tornadoGroup.position.z += tornadoVel.z * dt;
       tornadoVel.multiplyScalar(0.92);
 
-      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.60, 0.60);
-      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, 0.35, 0.85);
+      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.65, 0.65);
+      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -1.65, -0.85);
       tornadoGroup.position.y = window.TORNADO_ROOM_DEFAULT.y;
 
-      const isAimed = window.checkAimAtPoster ? window.checkAimAtPoster() : true;
+      const isAimed = window.checkAimAtPoster ? window.checkAimAtPoster() : false;
       const banner = document.getElementById('ar-warning-banner');
-      if (isAimed && banner && banner.style.display !== 'none') {
-        banner.style.display = 'none';
+      const badge = document.getElementById('ar-badge');
+      if (isAimed) {
+        if (banner && banner.style.display !== 'none') banner.style.display = 'none';
+        if (badge) {
+          badge.textContent = '🎯 Афиша в прицеле! Смахните ураган в афишу!';
+          badge.classList.add('detected');
+        }
+      } else {
+        if (banner && banner.style.display === 'none') {
+          banner.style.display = 'block';
+          banner.textContent = '⚠️ АФИША ВНЕ КАДРА! НАВЕДИТЕ НА АФИШУ ДЛЯ УДАРА!';
+        }
+        if (badge) {
+          badge.textContent = '🌪️ Ураган в комнате! Ищите афишу...';
+          badge.classList.remove('detected');
+        }
       }
     }
 
@@ -706,8 +746,8 @@
 
         legsSlide = Math.min(1.0, b * 1.8);
         if (witchLegsGroup) {
-          witchLegsGroup.position.y = 0.04 - legsSlide * 0.06;
-          witchLegsGroup.position.z = 0.08 + legsSlide * 0.14;
+          witchLegsGroup.visible = true;
+          witchLegsGroup.position.z = -0.68 + legsSlide * 0.16;
         }
       } else {
         houseGroup.position.copy(houseFlight.targetPos);

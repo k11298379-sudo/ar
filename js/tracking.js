@@ -159,14 +159,19 @@
 
                 const badge = document.getElementById('ar-badge');
                 if (badge) {
-                  badge.textContent = '🔍 Наведите на афишу целиком';
+                  badge.textContent = window.tornadoState !== 'WAITING_FOR_POSTER'
+                    ? '🌪️ Ураган в комнате! Ищите афишу...'
+                    : '🔍 Наведите на афишу целиком';
                   badge.classList.remove('detected');
                 }
 
                 // Напоминаем навести камеру на афишу
                 if (window.tornadoState !== 'WAITING_FOR_POSTER') {
                   const banner = document.getElementById('ar-warning-banner');
-                  if (banner) banner.style.display = 'block';
+                  if (banner) {
+                    banner.style.display = 'block';
+                    banner.textContent = '⚠️ АФИША ВНЕ КАДРА! НАВЕДИТЕ НА АФИШУ ДЛЯ УДАРА!';
+                  }
                 }
               }
             }
