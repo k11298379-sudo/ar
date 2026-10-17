@@ -6,8 +6,8 @@
   'use strict';
 
   // Константы позиционирования для MR
-  const TORNADO_POSTER_POS   = new THREE.Vector3(0.14, -0.40, -0.85); // зарождается у домика Ведьмы в глубине портала
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.42, -1.25); // вырывается вперед в комнату перед зрителем
+  const TORNADO_POSTER_POS   = new THREE.Vector3(0.06, -0.38, -0.80); // зарождается у домика Ведьмы в глубине портала
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.55, 0.60); // приземляется перед афишей на стол (+60см к пользователю)
   const TORNADO_BASE_SCALE   = 0.44; // базовый масштаб вихря (~1.1м высота)
 
   window.TORNADO_POSTER_POS   = TORNADO_POSTER_POS;
@@ -393,52 +393,45 @@
     rightBar.position.set(frameW / 2 - borderThick / 2, 0, frameD / 2);
     posterGroup.add(rightBar);
 
-    // 2. Каменный свод портала, врезающийся вглубь стены (от Z=0 до Z=-0.45)
-    const archDepth = 0.45;
+    // 2. Каменная 3D-комната портала, уходящая вглубь стены (от Z=0 до Z=-1.50)
+    const chamberDepth = 1.50;
     const innerW = frameW - borderThick * 2;
     const innerH = frameH - borderThick * 2;
     const portalStoneMat = new THREE.MeshStandardMaterial({
       map: stoneWallTexture,
       roughness: 0.88,
-      side: THREE.DoubleSide
+      side: THREE.FrontSide
     });
 
-    // Левая каменная стена
-    const leftWallGeo = new THREE.PlaneGeometry(archDepth, innerH);
+    // Левая каменная стена портала
+    const leftWallGeo = new THREE.PlaneGeometry(chamberDepth, innerH);
     leftWallGeo.rotateY(Math.PI / 2);
     const leftWall = new THREE.Mesh(leftWallGeo, portalStoneMat);
-    leftWall.position.set(-innerW / 2, 0, -archDepth / 2);
+    leftWall.position.set(-innerW / 2, 0, -chamberDepth / 2);
     posterGroup.add(leftWall);
 
-    // Правая каменная стена
-    const rightWallGeo = new THREE.PlaneGeometry(archDepth, innerH);
+    // Правая каменная стена портала
+    const rightWallGeo = new THREE.PlaneGeometry(chamberDepth, innerH);
     rightWallGeo.rotateY(-Math.PI / 2);
     const rightWall = new THREE.Mesh(rightWallGeo, portalStoneMat);
-    rightWall.position.set(innerW / 2, 0, -archDepth / 2);
+    rightWall.position.set(innerW / 2, 0, -chamberDepth / 2);
     posterGroup.add(rightWall);
 
     // Верхний каменный свод
-    const topArchGeo = new THREE.PlaneGeometry(innerW, archDepth);
+    const topArchGeo = new THREE.PlaneGeometry(innerW, chamberDepth);
     topArchGeo.rotateX(Math.PI / 2);
     const topArch = new THREE.Mesh(topArchGeo, portalStoneMat);
-    topArch.position.set(0, innerH / 2, -archDepth / 2);
+    topArch.position.set(0, innerH / 2, -chamberDepth / 2);
     posterGroup.add(topArch);
 
-    // Нижний порог
-    const btmSillGeo = new THREE.PlaneGeometry(innerW, archDepth);
-    btmSillGeo.rotateX(-Math.PI / 2);
-    const btmSill = new THREE.Mesh(btmSillGeo, portalStoneMat);
-    btmSill.position.set(0, -innerH / 2, -archDepth / 2);
-    posterGroup.add(btmSill);
-
-    // 3. Открытое пространство Волшебной страны Оз (clearingGroup)
+    // 3. Открытое пространство Волшебной страны Оз внутри портала (clearingGroup)
     clearingGroup = new THREE.Group();
     clearingGroup.name = "PosterFairytaleMeadow";
     clearingGroup.position.set(0, 0, 0);
 
-    // А) ГОРИЗОНТАЛЬНАЯ ПОЛЯНА (трава на уровне пола, уходит в стену на 2.4 метра!)
+    // А) ГОРИЗОНТАЛЬНАЯ ПОЛЯНА (трава на полу портала от порога Z=0 до Z=-1.50)
     const meadowGroundY = -innerH / 2; // -0.69
-    const meadowGeo = new THREE.PlaneGeometry(3.6, 2.6, 8, 8);
+    const meadowGeo = new THREE.PlaneGeometry(innerW * 0.99, chamberDepth);
     meadowGeo.rotateX(-Math.PI / 2);
     const meadowMat = new THREE.MeshStandardMaterial({
       map: grassMeadowTexture,
@@ -446,51 +439,51 @@
       side: THREE.FrontSide
     });
     const meadowMesh = new THREE.Mesh(meadowGeo, meadowMat);
-    meadowMesh.position.set(0, meadowGroundY, -1.35);
+    meadowMesh.position.set(0, meadowGroundY + 0.002, -chamberDepth / 2);
     clearingGroup.add(meadowMesh);
 
-    // Б) ДОРОГА ИЗ ЖЁЛТОГО КИРПИЧА (лежит на траве и вьется от горизонта прямо к порогу!)
-    const roadGeo = new THREE.PlaneGeometry(0.36, 2.2);
+    // Б) ДОРОГА ИЗ ЖЁЛТОГО КИРПИЧА (лежит строго на траве портала и вьется к порогу)
+    const roadGeo = new THREE.PlaneGeometry(0.24, chamberDepth * 0.98);
     roadGeo.rotateX(-Math.PI / 2);
     const roadMat = new THREE.MeshStandardMaterial({
       map: yellowBrickTexture,
       roughness: 0.65
     });
     const roadMesh = new THREE.Mesh(roadGeo, roadMat);
-    roadMesh.position.set(0.04, meadowGroundY + 0.005, -1.2);
-    roadMesh.rotation.y = -0.06;
+    roadMesh.position.set(0.04, meadowGroundY + 0.006, -chamberDepth / 2);
+    roadMesh.rotation.y = -0.05;
     clearingGroup.add(roadMesh);
 
-    // В) СКАЗОЧНОЕ НЕБО ОЗ (панорамный купол в глубине на Z = -2.3 с градиентом, облаками и Изумрудным Городом)
-    const skyGeo = new THREE.CylinderGeometry(2.6, 2.6, 2.8, 28, 1, true, -Math.PI * 0.55, Math.PI * 1.1);
+    // В) СКАЗОЧНОЕ НЕБО ОЗ (плоская задняя стена на Z = -1.49 с облаками и шпилями Изумрудного Города)
+    const skyGeo = new THREE.PlaneGeometry(innerW, innerH);
     const skyMat = new THREE.MeshBasicMaterial({
       map: fairytaleSkyTexture,
-      side: THREE.BackSide,
+      side: THREE.FrontSide,
       depthWrite: false
     });
     const skyMesh = new THREE.Mesh(skyGeo, skyMat);
-    skyMesh.position.set(0, 0.45, -0.6);
+    skyMesh.position.set(0, 0, -chamberDepth + 0.01);
     clearingGroup.add(skyMesh);
 
-    // Г) 3D-ДЕРЕВЬЯ НА РАЗНОЙ ГЛУБИНЕ (создают мощнейший параллакс глубины в стену)
+    // Г) 3D-ДЕРЕВЬЯ ВНУТРИ ПОРТАЛА (создают параллакс глубины без выхода наружу)
     function addMeadow3DTree(x, z, scale = 1.0) {
       const treeGroup = new THREE.Group();
       treeGroup.position.set(x, meadowGroundY, z);
 
       // Ствол
       const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.024 * scale, 0.038 * scale, 0.24 * scale, 6),
+        new THREE.CylinderGeometry(0.020 * scale, 0.030 * scale, 0.22 * scale, 6),
         new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 })
       );
-      trunk.position.y = 0.12 * scale;
+      trunk.position.y = 0.11 * scale;
       treeGroup.add(trunk);
 
       // 3 яруса изумрудной кроны
       const crownColors = [0x14532d, 0x15803d, 0x22c55e];
       [
-        { r: 0.18, h: 0.28, y: 0.26 },
-        { r: 0.14, h: 0.24, y: 0.40 },
-        { r: 0.10, h: 0.20, y: 0.52 }
+        { r: 0.15, h: 0.24, y: 0.22 },
+        { r: 0.12, h: 0.20, y: 0.34 },
+        { r: 0.08, h: 0.16, y: 0.44 }
       ].forEach((tier, tIdx) => {
         const cMesh = new THREE.Mesh(
           new THREE.ConeGeometry(tier.r * scale, tier.h * scale, 7),
@@ -503,13 +496,11 @@
       clearingGroup.add(treeGroup);
     }
 
-    // Рассадка деревьев: передний план, средний план, задний план
-    addMeadow3DTree(-0.35, -0.40, 0.85); // впереди слева у входа
-    addMeadow3DTree(0.38, -0.48, 0.90);  // впереди справа
-    addMeadow3DTree(-0.62, -0.92, 1.15); // середина слева
-    addMeadow3DTree(0.65, -1.05, 1.20);  // середина справа
-    addMeadow3DTree(-0.85, -1.55, 1.45); // дальний план слева
-    addMeadow3DTree(0.78, -1.70, 1.40);  // дальний план справа
+    // Деревья строго внутри камеры портала
+    addMeadow3DTree(-0.28, -0.40, 0.75); // переднее слева
+    addMeadow3DTree(0.28, -0.50, 0.80);  // переднее справа
+    addMeadow3DTree(-0.30, -1.05, 0.95); // среднее слева
+    addMeadow3DTree(0.30, -1.18, 0.90);  // дальнее справа
 
     // Д) Парящие светлячки / волшебные споры
     const sparkleCount = 45;

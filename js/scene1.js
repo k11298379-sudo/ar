@@ -28,9 +28,13 @@
   const ERUPTION_DURATION = 2100;
   let tornadoVel = new THREE.Vector3(0, 0, 0);
 
-  // Гироскоп и ориентация камеры (~-18° естественный наклон камеры на пол/стол)
+  // Гироскоп и пространственная привязка в комнате
   let gyroActive = false;
-  let camGyroPitch = -0.32, camGyroYaw = 0;
+  let currentGyroYaw = 0, currentGyroPitch = 0;
+  let lastSeenGyroYaw = 0, lastSeenGyroPitch = 0;
+  let hasLockedPosterRoomAnchor = false;
+  let lockedTornadoWorldPos = new THREE.Vector3(0, -0.50, -1.20);
+  let tmpVec = new THREE.Vector3();
 
   // Полёт домика
   const houseFlight = {
@@ -209,21 +213,17 @@
   }
 
   function onOrientationChange(e) {
-    if (e.beta === null) return;
+    if (e.alpha === null && e.beta === null) return;
     gyroActive = true;
 
-    // В портретном режиме (на смартфоне):
-    // e.beta: 90° = телефон вертикально (pitch = 0°)
-    // e.beta: 45°..65° = телефон наклонен вперед на стол/пол (pitch = -25°..-45°)
-    const targetPitch = (e.beta - 90) * (Math.PI / 180);
-    camGyroPitch = THREE.MathUtils.clamp(targetPitch, -1.15, 0.45);
-    window.camGyroPitch = camGyroPitch;
-
-    if (e.gamma !== null) {
-      const gNorm = THREE.MathUtils.clamp(e.gamma / 45, -1, 1);
-      camGyroYaw = THREE.MathUtils.clamp(-gNorm * 0.45, -0.65, 0.65);
-      window.camGyroYaw = camGyroYaw;
+    if (e.alpha !== null) {
+      currentGyroYaw = e.alpha * (Math.PI / 180);
     }
+    if (e.beta !== null) {
+      currentGyroPitch = (e.beta - 80) * (Math.PI / 180);
+    }
+    window.camGyroPitch = currentGyroPitch;
+    window.camGyroYaw   = currentGyroYaw;
   }
 
   // ─── ВЫРЫВАНИЕ УРАГАНА ИЗ АФИШИ ────────────────────────
@@ -548,9 +548,23 @@
       const ep = Math.min(1.0, (time - eruptionStartTime) / ERUPTION_DURATION);
       const ease = 1 - Math.pow(1 - ep, 3);
 
-      if (tornadoGroup) {
-        tornadoGroup.position.lerpVectors(window.TORNADO_POSTER_POS, window.TORNADO_ROOM_DEFAULT, ease);
-        tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.45;
+      if (tornadoGroup && roomTornadoRoot) {
+        // Ураган вырывается из глубины афиши наружу в комнату
+        tmpVec.lerpVectors(window.TORNADO_POSTER_POS, window.TORNADO_ROOM_DEFAULT, ease);
+        tmpVec.y += Math.sin(ep * Math.PI) * 0.40;
+
+        if (opticalTargetDetected && dioramaGroup) {
+          dioramaGroup.localToWorld(tmpVec);
+          roomTornadoRoot.position.copy(tmpVec);
+          lockedTornadoWorldPos.copy(tmpVec);
+          lastSeenGyroYaw = currentGyroYaw;
+          lastSeenGyroPitch = currentGyroPitch;
+          hasLockedPosterRoomAnchor = true;
+        } else {
+          roomTornadoRoot.position.set(0, -0.45, -1.25);
+        }
+
+        tornadoGroup.position.set(0, 0, 0);
         const currentScale = THREE.MathUtils.lerp(0.04, window.TORNADO_BASE_SCALE, ease);
         tornadoGroup.scale.setScalar(currentScale);
         tornadoGroup.rotation.y += dt * 14.0;
@@ -564,44 +578,70 @@
         tornadoState = 'ROAMING';
         window.tornadoState = tornadoState;
         if (tornadoGroup) {
-          tornadoGroup.position.copy(window.TORNADO_ROOM_DEFAULT);
           tornadoGroup.scale.setScalar(window.TORNADO_BASE_SCALE);
         }
 
         if (floorContactMesh) {
           floorContactMesh.visible = true;
-          floorContactMesh.position.set(tornadoGroup.position.x, window.TORNADO_ROOM_DEFAULT.y + 0.005, tornadoGroup.position.z);
+          floorContactMesh.position.set(0, 0.005, 0);
         }
 
-        if (window.triggerObstacleImpact && tornadoGroup) {
-          window.triggerObstacleImpact(tornadoGroup.position, new THREE.Vector3(0, 1, 0));
+        if (window.triggerObstacleImpact && roomTornadoRoot) {
+          window.triggerObstacleImpact(roomTornadoRoot.position, new THREE.Vector3(0, 1, 0));
         }
         if (window.sfx && window.sfx.tada) window.sfx.tada();
 
         const banner = document.getElementById('swipe-hint-text');
         if (banner) banner.textContent = '🌪️ Ураган перед вами! Смахните его в сторону афиши!';
       }
-    } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup) {
+    } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup && roomTornadoRoot) {
       tornadoVel.x += Math.sin(elapsed * 1.5) * 0.003;
       tornadoVel.z += Math.cos(elapsed * 1.2) * 0.003;
-      tornadoGroup.position.x += tornadoVel.x * dt;
-      tornadoGroup.position.z += tornadoVel.z * dt;
       tornadoVel.multiplyScalar(0.92);
-
-      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.65, 0.65);
-      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -1.65, -0.85);
-      tornadoGroup.position.y = window.TORNADO_ROOM_DEFAULT.y;
 
       const isAimed = window.checkAimAtPoster ? window.checkAimAtPoster() : false;
       const banner = document.getElementById('ar-warning-banner');
       const badge = document.getElementById('ar-badge');
-      if (isAimed) {
+
+      if (isAimed && dioramaGroup) {
+        // Камера видит афишу: ураган прочно зафиксирован на столе перед афишей с учетом параллакса!
+        tmpVec.copy(window.TORNADO_ROOM_DEFAULT);
+        tmpVec.x += tornadoVel.x;
+        tmpVec.z += tornadoVel.z;
+        dioramaGroup.localToWorld(tmpVec);
+
+        roomTornadoRoot.position.lerp(tmpVec, 0.25);
+        lockedTornadoWorldPos.copy(roomTornadoRoot.position);
+        lastSeenGyroYaw = currentGyroYaw;
+        lastSeenGyroPitch = currentGyroPitch;
+        hasLockedPosterRoomAnchor = true;
+
         if (banner && banner.style.display !== 'none') banner.style.display = 'none';
         if (badge) {
           badge.textContent = '🎯 Афиша в прицеле! Смахните ураган в афишу!';
           badge.classList.add('detected');
         }
       } else {
+        // Камера отвернута в комнату: ураган держится в пространстве комнаты по гироскопу, НЕ липнет к центру!
+        if (hasLockedPosterRoomAnchor) {
+          let dYaw = currentGyroYaw - lastSeenGyroYaw;
+          while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+          while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+          const dPitch = currentGyroPitch - lastSeenGyroPitch;
+
+          const dist = Math.hypot(lockedTornadoWorldPos.x, lockedTornadoWorldPos.z);
+          const baseAngleY = Math.atan2(lockedTornadoWorldPos.x, -lockedTornadoWorldPos.z);
+          const newAngleY = baseAngleY - dYaw;
+
+          const targetX = Math.sin(newAngleY) * dist + tornadoVel.x;
+          const targetZ = -Math.cos(newAngleY) * dist + tornadoVel.z;
+          const targetY = lockedTornadoWorldPos.y + dPitch * 0.75;
+
+          roomTornadoRoot.position.x = THREE.MathUtils.lerp(roomTornadoRoot.position.x, targetX, 0.2);
+          roomTornadoRoot.position.z = THREE.MathUtils.lerp(roomTornadoRoot.position.z, targetZ, 0.2);
+          roomTornadoRoot.position.y = THREE.MathUtils.lerp(roomTornadoRoot.position.y, targetY, 0.2);
+        }
+
         if (banner && banner.style.display === 'none') {
           banner.style.display = 'block';
           banner.textContent = '⚠️ АФИША ВНЕ КАДРА! НАВЕДИТЕ НА АФИШУ ДЛЯ УДАРА!';
@@ -642,7 +682,7 @@
     const spinRate = (4.8 * tornadoSpeedMult) * dt;
 
     if (floorContactMesh && tornadoGroup) {
-      floorContactMesh.position.set(tornadoGroup.position.x, window.TORNADO_ROOM_DEFAULT.y + 0.005, tornadoGroup.position.z);
+      floorContactMesh.position.set(0, 0.005, 0);
       floorContactMesh.rotation.y += spinRate * 2.0;
       floorContactMesh.scale.setScalar((tornadoGroup.scale.x / window.TORNADO_BASE_SCALE) * (0.96 + Math.sin(elapsed * 5.0) * 0.05));
       if (!tornadoBlowAway) {
@@ -651,7 +691,7 @@
     }
 
     if (vortexLight && tornadoGroup) {
-      vortexLight.position.set(tornadoGroup.position.x, tornadoGroup.position.y + 0.85, tornadoGroup.position.z);
+      vortexLight.position.set(0, 0.85, 0);
     }
 
     for (let i = 0; i < tornadoRings.length; i++) {
@@ -699,9 +739,9 @@
       const bobY = Math.sin(elapsed * 4.2) * 0.035;
 
       houseGroup.position.set(
-        tornadoGroup.position.x + Math.cos(hAngle) * orbitR,
-        tornadoGroup.position.y + 0.62 + bobY,
-        tornadoGroup.position.z + Math.sin(hAngle) * orbitR
+        Math.cos(hAngle) * orbitR,
+        0.62 + bobY,
+        Math.sin(hAngle) * orbitR
       );
 
       houseGroup.rotation.y = -hAngle + Math.PI / 4;
