@@ -127,17 +127,19 @@
                 triggerPosterEncounter();
               }
             } else {
-              // Афиша вышла из кадра — скрываем 3D-диораму
-              opticalTargetDetected = false;
-              window.opticalTargetDetected = false;
+              // Афиша потеряна из кадра — сглаживаем микро-потери кадра (буфер 350мс)
+              if (performance.now() - opticalLastSeenTime > 350) {
+                opticalTargetDetected = false;
+                window.opticalTargetDetected = false;
 
-              if (dioramaGroup) dioramaGroup.visible = false;
-              if (posterGroup) posterGroup.visible = false;
+                if (dioramaGroup) dioramaGroup.visible = false;
+                if (posterGroup) posterGroup.visible = false;
 
-              // Напоминаем навести камеру на афишу
-              if (window.tornadoState !== 'WAITING_FOR_POSTER') {
-                const banner = document.getElementById('ar-warning-banner');
-                if (banner) banner.style.display = 'block';
+                // Напоминаем навести камеру на афишу
+                if (window.tornadoState !== 'WAITING_FOR_POSTER') {
+                  const banner = document.getElementById('ar-warning-banner');
+                  if (banner) banner.style.display = 'block';
+                }
               }
             }
           }
@@ -157,6 +159,13 @@
         const l = new THREE.Vector3(p, p, p);
         const c = new THREE.Matrix4().compose(u, o, l);
         postMatrices.push(c);
+      }
+
+      console.log('[OpticalAR] Pre-warming GPU shaders via dummyRun...');
+      try {
+        await mindarController.dummyRun(videoEl);
+      } catch (e) {
+        console.warn('[OpticalAR] dummyRun warning:', e);
       }
 
       updateCameraProjection();
