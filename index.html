@@ -88,6 +88,96 @@
       justify-content: center;
     }
 
+    /* ── AR TARGET PROMPT (НАВЕДИТЕСЬ НА АФИШУ) ── */
+    #ar-target-prompt {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      z-index: 55;
+    }
+    .ar-target-frame {
+      position: relative;
+      width: clamp(250px, 72vw, 320px);
+      height: clamp(330px, 55vh, 430px);
+      border: 2px dashed rgba(0, 255, 162, 0.45);
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 18px;
+      text-align: center;
+      background: radial-gradient(circle, rgba(0, 255, 162, 0.08) 0%, rgba(0, 0, 0, 0.55) 85%);
+      backdrop-filter: blur(4px);
+      box-shadow: 0 0 40px rgba(0, 255, 162, 0.15), inset 0 0 30px rgba(0, 255, 162, 0.08);
+      animation: targetPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes targetPulse {
+      0%, 100% { border-color: rgba(0, 255, 162, 0.4); box-shadow: 0 0 35px rgba(0, 255, 162, 0.15); }
+      50% { border-color: rgba(0, 255, 162, 0.9); box-shadow: 0 0 55px rgba(0, 255, 162, 0.35); }
+    }
+    .ar-target-corner {
+      position: absolute;
+      width: 26px; height: 26px;
+      border-color: #00ffa2;
+      border-style: solid;
+    }
+    .ar-target-corner.tl { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 20px; }
+    .ar-target-corner.tr { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 20px; }
+    .ar-target-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 20px; }
+    .ar-target-corner.br { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 20px; }
+
+    .ar-target-icon {
+      font-size: 42px;
+      margin-bottom: 12px;
+      filter: drop-shadow(0 0 16px rgba(0, 255, 162, 0.8));
+      animation: floatIcon 2s ease-in-out infinite alternate;
+    }
+    @keyframes floatIcon {
+      0% { transform: translateY(-4px); }
+      100% { transform: translateY(4px); }
+    }
+    .ar-target-title {
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    }
+    .ar-target-desc {
+      color: #a7f3d0;
+      font-size: 12px;
+      line-height: 1.4;
+      max-width: 240px;
+      margin-bottom: 16px;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+    }
+    .ar-target-btn {
+      background: rgba(0, 255, 162, 0.22);
+      border: 1px solid #00ffa2;
+      color: #e6fffa;
+      padding: 9px 18px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 4px 15px rgba(0, 255, 162, 0.25);
+      transition: all 0.2s ease;
+    }
+    .ar-target-btn:active {
+      transform: scale(0.96);
+      background: #00ffa2;
+      color: #012415;
+    }
+
     /* Моргающая надпись предупреждения */
     #ar-warning-banner {
       margin-top: 16px;
@@ -488,8 +578,22 @@
       <div id="three-container"></div>
       <canvas id="swipe-trail"></canvas>
 
-      <!-- МОРГАЮЩЕЕ ПРЕДУПРЕЖДЕНИЕ -->
+      <!-- МОРГАЮЩЕЕ ПРЕДУПРЕЖДЕНИЕ И РАМКА ПРИЦЕЛА НА АФИШУ -->
       <div id="ar-aim-container">
+        <!-- Рамка прицеливания на афишу (скрывается, когда афиша найдена и ураган вылетел) -->
+        <div id="ar-target-prompt">
+          <div class="ar-target-frame">
+            <span class="ar-target-corner tl"></span>
+            <span class="ar-target-corner tr"></span>
+            <span class="ar-target-corner bl"></span>
+            <span class="ar-target-corner br"></span>
+            <div class="ar-target-icon">🖼️</div>
+            <div class="ar-target-title">Наведите камеру на афишу</div>
+            <div class="ar-target-desc">Держите афишу фильма в рамке, чтобы оживить сказочный мир</div>
+            <button id="btn-force-poster" class="ar-target-btn">✨ Оживить афишу</button>
+          </div>
+        </div>
+
         <div id="ar-warning-banner" style="display:none;">
           ⚠️ НАВЕДИТЕСЬ КАМЕРОЙ НА АФИШУ!
         </div>
@@ -972,14 +1076,19 @@
   let tornadoSquashCurrent   = 1.0;
   let tornadoSquashTarget    = 1.0;
 
-  // Ураган в пространстве: Сразу ROAMING прямо перед зрителем на полу/столе
-  let tornadoState = 'ROAMING';
+  // Ураган в пространстве:
+  // 'WAITING_FOR_POSTER' — урагана нет! Появится только при наведении на афишу
+  // 'ERUPTING' — вырывается из глубины афиши вперед в комнату
+  // 'ROAMING' — приземлился на пол/стол, можно взаимодействовать
+  let tornadoState = 'WAITING_FOR_POSTER';
   let eruptionStartTime = 0;
-  const ERUPTION_DURATION = 1800;
-  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 1.40, -2.75);
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, 0.0, 0.2);
+  const ERUPTION_DURATION = 2100;
+  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 1.25, -3.22); // глубина внутри афиши
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, 0.0, 0.2);   // место приземления перед камерой
   let tornadoVel = new THREE.Vector3(0, 0, 0);
   let isAimedAtPoster = false;
+  let posterEncounterTriggered = false;
+  let aimHoldTime = 0.0;
 
   // Базовый масштаб урагана для MR (помещается в комнате и на столе в поле зрения)
   const TORNADO_BASE_SCALE = 0.32;
@@ -1072,12 +1181,19 @@
 
     window.addEventListener('resize', onThreeResize);
 
-    // Сразу активен в комнате/на столе перед камерой
-    tornadoState = 'ROAMING';
-    tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
-    tornadoGroup.scale.setScalar(TORNADO_BASE_SCALE);
-    tornadoGroup.visible = true;
+    // Изначально урагана нет! Он появится только при наведении на афишу
+    tornadoState = 'WAITING_FOR_POSTER';
+    if (tornadoGroup) {
+      tornadoGroup.position.copy(TORNADO_POSTER_POS);
+      tornadoGroup.scale.setScalar(0.04);
+      tornadoGroup.visible = false;
+    }
+    if (houseGroup) houseGroup.visible = false;
+    if (floorContactMesh) floorContactMesh.visible = false;
+    if (posterGroup) posterGroup.visible = false;
     swipeCount = 0;
+    posterEncounterTriggered = false;
+    aimHoldTime = 0.0;
 
     // 6. Start animation loop
     tAnimId = requestAnimationFrame(threeRenderLoop);
@@ -1306,61 +1422,112 @@
     floorAbrasionTexture = new THREE.CanvasTexture(abrC);
   }
 
-  // ─── POSTER BASE & ENCHANTED CLEARING ─────────────────
+  // ─── POSTER BASE & ENCHANTED CLEARING (3D DIORAMA DEPTH PORTAL) ───
   function createPosterAndClearing() {
     // 1. Афиша фильма в AR
     posterGroup = new THREE.Group();
     posterGroup.name = "AR_PosterTarget";
     posterGroup.position.set(0, 1.25, -2.8);
-    posterGroup.rotation.x = -0.06;
-    posterGroup.visible = false; // Скрыта по умолчанию! Появляется СТРОГО на физической афише!
+    posterGroup.rotation.x = -0.04;
+    posterGroup.visible = false; // Скрыта по умолчанию! Появляется СТРОГО при наведении на афишу!
 
-    // Рамка и полотно постера
-    const postGeo = new THREE.BoxGeometry(2.4, 3.55, 0.04);
-    const postMatSides = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.3 });
-    const postMatTop   = new THREE.MeshStandardMaterial({ map: posterTexture, roughness: 0.65 });
-    const postMats     = [postMatSides, postMatSides, postMatSides, postMatSides, postMatTop, postMatSides];
-    posterMesh = new THREE.Mesh(postGeo, postMats);
-    posterMesh.receiveShadow = true;
+    // 1. Внешняя золотая рама картины/афиши (на плоскости стены)
+    const frameW = 2.44, frameH = 3.55, frameD = 0.08, borderThick = 0.12;
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.88, roughness: 0.28 });
+
+    // Верхняя и нижняя планки
+    const hBarGeo = new THREE.BoxGeometry(frameW, borderThick, frameD);
+    const topBar = new THREE.Mesh(hBarGeo, goldMat);
+    topBar.position.set(0, frameH / 2 - borderThick / 2, 0);
+    posterGroup.add(topBar);
+
+    const btmBar = new THREE.Mesh(hBarGeo, goldMat);
+    btmBar.position.set(0, -frameH / 2 + borderThick / 2, 0);
+    posterGroup.add(btmBar);
+
+    // Левая и правая планки
+    const vBarGeo = new THREE.BoxGeometry(borderThick, frameH - borderThick * 2, frameD);
+    const leftBar = new THREE.Mesh(vBarGeo, goldMat);
+    leftBar.position.set(-frameW / 2 + borderThick / 2, 0, 0);
+    posterGroup.add(leftBar);
+
+    const rightBar = new THREE.Mesh(vBarGeo, goldMat);
+    rightBar.position.set(frameW / 2 - borderThick / 2, 0, 0);
+    posterGroup.add(rightBar);
+
+    // 2. Внутренние скошенные стенки глубины портала (3D Depth Recess)
+    const recessDepth = 0.42;
+    const innerW = frameW - borderThick * 2;
+    const innerH = frameH - borderThick * 2;
+    const portalWallMat = new THREE.MeshStandardMaterial({ color: 0x052e16, roughness: 0.85 });
+
+    const leftWallGeo = new THREE.PlaneGeometry(recessDepth, innerH);
+    leftWallGeo.rotateY(Math.PI / 2);
+    const leftWall = new THREE.Mesh(leftWallGeo, portalWallMat);
+    leftWall.position.set(-innerW / 2, 0, -recessDepth / 2);
+    posterGroup.add(leftWall);
+
+    const rightWallGeo = new THREE.PlaneGeometry(recessDepth, innerH);
+    rightWallGeo.rotateY(-Math.PI / 2);
+    const rightWall = new THREE.Mesh(rightWallGeo, portalWallMat);
+    rightWall.position.set(innerW / 2, 0, -recessDepth / 2);
+    posterGroup.add(rightWall);
+
+    const topWallGeo = new THREE.PlaneGeometry(innerW, recessDepth);
+    topWallGeo.rotateX(Math.PI / 2);
+    const topWall = new THREE.Mesh(topWallGeo, portalWallMat);
+    topWall.position.set(0, innerH / 2, -recessDepth / 2);
+    posterGroup.add(topWall);
+
+    const btmWallGeo = new THREE.PlaneGeometry(innerW, recessDepth);
+    btmWallGeo.rotateX(-Math.PI / 2);
+    const btmWall = new THREE.Mesh(btmWallGeo, portalWallMat);
+    btmWall.position.set(0, -innerH / 2, -recessDepth / 2);
+    posterGroup.add(btmWall);
+
+    // 3. Заднее полотно афиши на глубине recessDepth
+    const backGeo = new THREE.PlaneGeometry(innerW, innerH);
+    const backMat = new THREE.MeshStandardMaterial({ map: posterTexture, roughness: 0.65 });
+    posterMesh = new THREE.Mesh(backGeo, backMat);
+    posterMesh.position.set(0, 0, -recessDepth);
     posterGroup.add(posterMesh);
 
-    // 2. Сказочное поле (перекрывает афишу через AR)
+    // 4. Сказочное поле (clearingGroup) — перекрывает задник в глубине афиши
     clearingGroup = new THREE.Group();
     clearingGroup.name = "PosterFairytaleMeadow";
-    clearingGroup.position.set(0, 0, 0.03);
+    clearingGroup.position.set(0, 0, -recessDepth + 0.02);
 
-    // Зелёное поле ровно по размеру афиши
-    const fieldGeo = new THREE.BoxGeometry(2.36, 3.50, 0.05);
-    const fieldMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.82, flatShading: true });
+    // Зелёное поле
+    const fieldGeo = new THREE.PlaneGeometry(innerW * 0.98, innerH * 0.98);
+    const fieldMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.82, flatShading: true });
     const fieldMesh = new THREE.Mesh(fieldGeo, fieldMat);
-    fieldMesh.receiveShadow = true;
     clearingGroup.add(fieldMesh);
 
-    // Дорожка из жёлтого кирпича через поле афиши
-    const pathGeo = new THREE.PlaneGeometry(0.55, 2.2);
-    const pathMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.75, side: THREE.DoubleSide });
+    // Дорожка из жёлтого кирпича через поле
+    const pathGeo = new THREE.PlaneGeometry(0.55, 2.4);
+    const pathMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.75 });
     const pathMesh = new THREE.Mesh(pathGeo, pathMat);
-    pathMesh.position.set(0.15, -0.65, 0.035);
-    pathMesh.rotation.z = -0.15;
+    pathMesh.position.set(0.12, -0.55, 0.02);
+    pathMesh.rotation.z = -0.12;
     clearingGroup.add(pathMesh);
 
-    // Сказочные полевые цветы на афише
+    // Сказочные полевые цветы
     const flowerColors = [0xef4444, 0xfde047, 0x38bdf8, 0xc084fc, 0xffffff];
-    const flowerGeo = new THREE.DodecahedronGeometry(0.035, 0);
-    for (let f = 0; f < 28; f++) {
+    const flowerGeo = new THREE.DodecahedronGeometry(0.04, 0);
+    for (let f = 0; f < 32; f++) {
       const col = flowerColors[f % flowerColors.length];
       const flMat = new THREE.MeshBasicMaterial({ color: col });
       const flower = new THREE.Mesh(flowerGeo, flMat);
-      const fx = (Math.random() - 0.5) * 2.0;
-      const fy = (Math.random() - 0.5) * 3.1;
-      flower.position.set(fx, fy, 0.04);
+      const fx = (Math.random() - 0.5) * (innerW * 0.85);
+      const fy = (Math.random() - 0.5) * (innerH * 0.85);
+      flower.position.set(fx, fy, 0.03);
       clearingGroup.add(flower);
     }
 
-    // Декоративные деревца по бокам афиши
+    // Декоративные деревца
     function addPosterTree(x, y, scale = 1.0) {
       const tg = new THREE.Group();
-      tg.position.set(x, y, 0.04);
+      tg.position.set(x, y, 0.03);
       const trunk = new THREE.Mesh(
         new THREE.CylinderGeometry(0.04 * scale, 0.06 * scale, 0.3 * scale, 6),
         new THREE.MeshStandardMaterial({ color: 0x5c2d0c, roughness: 0.9 })
@@ -1376,14 +1543,14 @@
       tg.add(crown);
       clearingGroup.add(tg);
     }
-    addPosterTree(-0.95, -0.8, 0.85);
-    addPosterTree(0.95, -0.5, 0.9);
-    addPosterTree(-0.9, 0.9, 0.75);
+    addPosterTree(-0.85, -0.7, 0.85);
+    addPosterTree(0.85, -0.5, 0.9);
+    addPosterTree(-0.8, 0.85, 0.75);
 
     posterGroup.add(clearingGroup);
     dioramaGroup.add(posterGroup);
 
-    // 3. Невидимая плоскость теней для реального пола комнаты (без искусственной земли!)
+    // 5. Невидимая плоскость теней реального пола
     const floorShadowGeo = new THREE.PlaneGeometry(35, 35);
     floorShadowGeo.rotateX(-Math.PI / 2);
     const floorShadowMat = new THREE.ShadowMaterial({ opacity: 0.38 });
@@ -1483,9 +1650,9 @@
   function createTornado() {
     tornadoGroup = new THREE.Group();
     tornadoGroup.name = "TornadoVortex";
-    tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
-    tornadoGroup.scale.setScalar(TORNADO_BASE_SCALE);
-    tornadoGroup.visible = true;
+    tornadoGroup.position.copy(TORNADO_POSTER_POS);
+    tornadoGroup.scale.setScalar(0.04);
+    tornadoGroup.visible = false;
     dioramaGroup.add(tornadoGroup);
 
     tornadoRings = [];
@@ -1561,6 +1728,7 @@
     });
     floorContactMesh = new THREE.Mesh(floorContactGeo, floorContactMat);
     floorContactMesh.position.set(tornadoGroup.position.x, 0.005, tornadoGroup.position.z);
+    floorContactMesh.visible = false;
     dioramaGroup.add(floorContactMesh);
 
     // 1200 объёмных частиц пыли и облаков
@@ -1765,6 +1933,7 @@
     cabin.position.y = -0.45;
     cabin.scale.setScalar(0.45);
     houseGroup.add(cabin);
+    houseGroup.visible = false;
     dioramaGroup.add(houseGroup);
   }
 
@@ -1971,6 +2140,9 @@
               opticalTargetDetected = true;
               opticalTargetMatrix = data.worldMatrix;
               opticalLastSeenTime = performance.now();
+              if (tornadoState === 'WAITING_FOR_POSTER') {
+                triggerPosterEncounter();
+              }
             } else {
               opticalTargetDetected = false;
               opticalTargetMatrix = null;
@@ -1992,9 +2164,58 @@
   let warningHideTimer = null;
 
   function checkAimAtPoster() {
-    // Камера наведена на афишу СТРОГО тогда, когда оптический трекинг видит реальную афишу!
-    // Если наведена на стол, пол или стену без афиши — возвращаем false!
-    return opticalTargetDetected === true;
+    // 1. Оптическое распознавание реальной афиши через MindAR
+    if (opticalTargetDetected === true) return true;
+
+    // 2. Направление камеры смартфона на афишу (горизонтально вперед на высоту афиши)
+    if (tCamera) {
+      const isPitchForward = (camGyroPitch > -0.32 && camGyroPitch < 0.28);
+      const isYawForward   = (Math.abs(camGyroYaw) < 0.42);
+      if (isPitchForward && isYawForward) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function triggerPosterEncounter() {
+    if (posterEncounterTriggered) return;
+    posterEncounterTriggered = true;
+
+    // 1. Афиша оживает! Показываем 3D портал с поляной и домиком ведьмы в глубине
+    if (posterGroup) posterGroup.visible = true;
+    doFlash('rgba(0, 255, 162, 0.7)', 350);
+    sfx.chime();
+
+    // Скрываем рамку прицеливания
+    const prompt = $('ar-target-prompt');
+    if (prompt) prompt.style.display = 'none';
+
+    // 2. Через 450мс ураган с ревом вырывается из глубины афиши в комнату
+    setTimeout(() => {
+      startTornadoEruption();
+    }, 450);
+  }
+
+  function startTornadoEruption() {
+    tornadoState = 'ERUPTING';
+    eruptionStartTime = performance.now();
+
+    // Начало движения: глубоко внутри афиши (0, 1.25, -3.22)
+    tornadoGroup.position.copy(TORNADO_POSTER_POS);
+    tornadoGroup.scale.setScalar(0.04);
+    tornadoGroup.visible = true;
+
+    // Домик и контактный след пока скрыты
+    houseGroup.visible = false;
+    if (floorContactMesh) floorContactMesh.visible = false;
+
+    sfx.wind(0.5);
+    sfx.snap();
+
+    if (swipeHintText) {
+      swipeHintText.textContent = '🌪️ ИЗ АФИШИ ВЫРЫВАЕТСЯ УРАГАН!';
+    }
   }
 
   // ─── SWIPE TRAIL & INTERACTION EVENTS ────────────────
@@ -2068,17 +2289,47 @@
     window.addEventListener('pointerup', endSwipe);
     window.addEventListener('pointercancel', endSwipe);
 
+    // Клик по кнопке оживления афиши или по рамке прицела
+    const btnForcePoster = $('btn-force-poster');
+    if (btnForcePoster) {
+      btnForcePoster.addEventListener('click', (e) => {
+        e.stopPropagation();
+        getCtx();
+        triggerPosterEncounter();
+      });
+    }
+
+    const arTargetPrompt = $('ar-target-prompt');
+    if (arTargetPrompt) {
+      arTargetPrompt.addEventListener('click', (e) => {
+        getCtx();
+        triggerPosterEncounter();
+      });
+    }
+
     // Клик по подсказке внизу
     if (swipeHint) {
       swipeHint.addEventListener('click', () => {
-        if (S.scene === 1 && houseState === 'ORBITING') handleSwipeGesture(0, -60);
+        if (S.scene === 1 && houseState === 'ORBITING' && tornadoState === 'ROAMING') handleSwipeGesture(0, -60);
       });
     }
   }
 
   // ─── 2-SWIPE AR MECHANIC & GROUND MOVEMENT ────────────
   function handleSwipeGesture(dx, dy) {
-    if (houseState !== 'ORBITING') return;
+    if (tornadoState === 'WAITING_FOR_POSTER') {
+      if (checkAimAtPoster()) {
+        triggerPosterEncounter();
+      } else if (arWarningBanner) {
+        arWarningBanner.style.display = 'block';
+        clearTimeout(warningHideTimer);
+        warningHideTimer = setTimeout(() => {
+          if (arWarningBanner) arWarningBanner.style.display = 'none';
+        }, 2200);
+      }
+      return;
+    }
+    if (houseState !== 'ORBITING' || tornadoState !== 'ROAMING') return;
 
     // Проверяем, наведена ли камера на афишу
     const aimed = checkAimAtPoster();
@@ -2205,14 +2456,62 @@
       tCamera.rotation.y = THREE.MathUtils.lerp(tCamera.rotation.y, camGyroYaw, dt * 6);
     }
 
-    // 0. Поляна с домиком Ведьмы отображается СТРОГО на реальной афише!
-    // На столе или в воздухе они полностью скрыты!
+    // 0. Поляна с домиком Ведьмы отображается СТРОГО при наведении на афишу
     if (posterGroup) {
-      posterGroup.visible = (opticalTargetDetected === true || houseState === 'LAUNCHING' || houseState === 'LANDED');
+      posterGroup.visible = (posterEncounterTriggered === true || opticalTargetDetected === true || houseState === 'LAUNCHING' || houseState === 'LANDED');
     }
 
-    // 1. Анимация урагана в комнате / на столе
-    if (tornadoState === 'ROAMING' && !tornadoBlowAway) {
+    // 1. Логика появления и движения урагана
+    if (tornadoState === 'WAITING_FOR_POSTER') {
+      // Ураган еще не появился! Ждем наведения на афишу
+      const aimed = checkAimAtPoster();
+      if (aimed) {
+        aimHoldTime += dt;
+        if (aimHoldTime >= 0.40) {
+          triggerPosterEncounter();
+        }
+      } else {
+        aimHoldTime = Math.max(0, aimHoldTime - dt);
+      }
+    } else if (tornadoState === 'ERUPTING') {
+      const ep = Math.min(1.0, (time - eruptionStartTime) / ERUPTION_DURATION);
+      const ease = 1 - Math.pow(1 - ep, 3); // кубический ease-out
+
+      // Вылет из глубины афиши (TORNADO_POSTER_POS) на пол/стол перед камерой
+      const targetRoomPos = new THREE.Vector3(0, groundElevationCurrent, 0.2);
+      tornadoGroup.position.lerpVectors(TORNADO_POSTER_POS, targetRoomPos, ease);
+      tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.55;
+
+      const currentScale = THREE.MathUtils.lerp(0.04, TORNADO_BASE_SCALE, ease);
+      tornadoGroup.scale.setScalar(currentScale);
+      tornadoGroup.rotation.y += dt * 14.0;
+
+      // Домик появляется в середине вылета (захвачен вихрем)
+      if (ep > 0.40 && !houseGroup.visible) {
+        houseGroup.visible = true;
+        cabin.scale.setScalar(0.45);
+      }
+
+      if (ep >= 1.0) {
+        // Ураган приземлился на пол/стол! Теперь с ним можно взаимодействовать!
+        tornadoState = 'ROAMING';
+        tornadoGroup.position.copy(targetRoomPos);
+        tornadoGroup.scale.setScalar(TORNADO_BASE_SCALE);
+
+        // Появляется след контакта с поверхностью
+        if (floorContactMesh) {
+          floorContactMesh.visible = true;
+          floorContactMesh.position.set(tornadoGroup.position.x, groundElevationCurrent + 0.005, tornadoGroup.position.z);
+        }
+
+        // Выброс пыли и звуковой удар от касания поверхности
+        triggerObstacleImpact(tornadoGroup.position, new THREE.Vector3(0, 1, 0));
+        sfx.tada();
+
+        const banner = $('swipe-hint-text');
+        if (banner) banner.textContent = '🌪️ Ураган на полу! Смахните его в сторону афиши!';
+      }
+    } else if (tornadoState === 'ROAMING' && !tornadoBlowAway) {
       // 1. Плавное естественное покачивание урагана по поверхности
       tornadoVel.x += Math.sin(elapsed * 1.5) * 0.005;
       tornadoVel.z += Math.cos(elapsed * 1.2) * 0.005;
