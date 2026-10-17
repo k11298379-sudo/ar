@@ -147,7 +147,8 @@
     const modalQrContainer = document.getElementById('modal-qr-container');
     if (!modalLink) return;
 
-    const finalUrl = 'https://k11298379-sudo.github.io/ar/';
+    const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const finalUrl = isLocal ? getHttpsUrl() : location.href;
     modalLink.textContent = finalUrl;
     modalLink.href = finalUrl;
 
