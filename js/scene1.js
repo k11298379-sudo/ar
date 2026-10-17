@@ -315,27 +315,6 @@
     window.addEventListener('pointerup', endSwipe);
     window.addEventListener('pointercancel', endSwipe);
 
-    const btnForcePoster = document.getElementById('btn-force-poster');
-    if (btnForcePoster) {
-      btnForcePoster.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.fallbackModeActive = true;
-        if (window.getCtx) window.getCtx();
-        if (window.setupFallbackDioramaPose) window.setupFallbackDioramaPose();
-        if (window.triggerPosterEncounter) window.triggerPosterEncounter(true);
-      });
-    }
-
-    const arTargetPrompt = document.getElementById('ar-target-prompt');
-    if (arTargetPrompt) {
-      arTargetPrompt.addEventListener('click', () => {
-        window.fallbackModeActive = true;
-        if (window.getCtx) window.getCtx();
-        if (window.setupFallbackDioramaPose) window.setupFallbackDioramaPose();
-        if (window.triggerPosterEncounter) window.triggerPosterEncounter(true);
-      });
-    }
-
     const swipeHint = document.getElementById('swipe-hint');
     if (swipeHint) {
       swipeHint.addEventListener('click', () => {
@@ -499,33 +478,19 @@
     const dt = Math.min(tClock ? tClock.getDelta() : 0.016, 0.05);
     const elapsed = tClock ? tClock.getElapsedTime() : (time * 0.001);
 
-    // Ориентация камеры
+    // Ориентация камеры: зафиксирована в центре системы координат AR
     if (tCamera) {
-      const cameraActive = window.cameraActive;
-      if (!cameraActive) {
-        tCamera.rotation.x = THREE.MathUtils.lerp(tCamera.rotation.x, camGyroPitch, dt * 6);
-        tCamera.rotation.y = THREE.MathUtils.lerp(tCamera.rotation.y, camGyroYaw, dt * 6);
-      } else {
-        tCamera.position.set(0, 0, 0);
-        tCamera.rotation.set(0, 0, 0);
-      }
+      tCamera.position.set(0, 0, 0);
+      tCamera.rotation.set(0, 0, 0);
     }
 
     // Видимость диорамы:
-    // При реальной камере диорама видна ТОЛЬКО когда физическая афиша в поле зрения!
-    const posterEncounterTriggered = window.posterEncounterTriggered;
+    // Диорама (поле, дом ведьмы, портал) видна ТОЛЬКО когда физическая афиша оптически обнаружена MindAR!
     const opticalTargetDetected = window.opticalTargetDetected;
     if (dioramaGroup) {
-      if (window.cameraActive && !window.fallbackModeActive) {
-        const isVisible = (opticalTargetDetected === true);
-        dioramaGroup.visible = isVisible;
-        if (window.posterGroup) window.posterGroup.visible = isVisible;
-      } else {
-        if (posterEncounterTriggered || opticalTargetDetected) {
-          dioramaGroup.visible = true;
-          if (window.posterGroup) window.posterGroup.visible = true;
-        }
-      }
+      const isVisible = (opticalTargetDetected === true);
+      dioramaGroup.visible = isVisible;
+      if (window.posterGroup) window.posterGroup.visible = isVisible;
     }
 
     const tornadoGroup = window.tornadoGroup;

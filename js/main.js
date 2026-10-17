@@ -36,7 +36,6 @@
     const cameraGate = document.getElementById('camera-gate');
     const camGateError = document.getElementById('camera-gate-error');
     const camVideo   = document.getElementById('camera-video');
-    const mockBg     = document.getElementById('mock-bg');
     const btnCam     = document.getElementById('btn-cam');
 
     // Проверка HTTPS
@@ -82,10 +81,6 @@
       cameraActive = true;
       window.cameraActive = true;
 
-      if (mockBg) {
-        mockBg.classList.add('hidden');
-        mockBg.style.display = 'none';
-      }
       if (cameraGate) cameraGate.style.display = 'none';
       if (httpsModal) httpsModal.style.display = 'none';
 
@@ -122,7 +117,6 @@
 
   function stopCamera() {
     const camVideo = document.getElementById('camera-video');
-    const mockBg   = document.getElementById('mock-bg');
     const btnCam   = document.getElementById('btn-cam');
 
     if (camVideo && camVideo.srcObject) {
@@ -132,10 +126,6 @@
     cameraActive = false;
     window.cameraActive = false;
 
-    if (mockBg) {
-      mockBg.classList.remove('hidden');
-      mockBg.style.display = 'block';
-    }
     if (btnCam) {
       btnCam.style.borderColor = '';
       btnCam.style.boxShadow = '';
@@ -178,10 +168,8 @@
   // ─── ПРИВЯЗКА СОБЫТИЙ ИНТЕРФЕЙСА ───────────────────────
   function setupUIBindings() {
     const btnGotoHttps   = document.getElementById('btn-goto-https');
-    const btnSkipHttps   = document.getElementById('btn-skip-https');
     const httpsModal     = document.getElementById('https-modal');
     const btnRequestCam  = document.getElementById('btn-request-cam');
-    const btnMockMode    = document.getElementById('btn-mock-mode');
     const cameraGate     = document.getElementById('camera-gate');
     const btnCam         = document.getElementById('btn-cam');
     const btnSound       = document.getElementById('btn-sound');
@@ -195,24 +183,6 @@
 
     if (btnGotoHttps) {
       btnGotoHttps.addEventListener('click', () => { location.href = getHttpsUrl(); });
-    }
-
-    if (btnSkipHttps) {
-      btnSkipHttps.addEventListener('click', () => {
-        if (httpsModal) httpsModal.style.display = 'none';
-        if (window.getCtx) window.getCtx();
-        window.fallbackModeActive = true;
-        if (window.setupFallbackDioramaPose) window.setupFallbackDioramaPose();
-      });
-    }
-
-    if (btnMockMode) {
-      btnMockMode.addEventListener('click', () => {
-        if (cameraGate) cameraGate.style.display = 'none';
-        if (window.getCtx) window.getCtx();
-        window.fallbackModeActive = true;
-        if (window.setupFallbackDioramaPose) window.setupFallbackDioramaPose();
-      });
     }
 
     if (btnRequestCam) {

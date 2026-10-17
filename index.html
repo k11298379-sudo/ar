@@ -20,7 +20,7 @@
       console.log('✅ MindAR Optical Image Tracking engine ready!');
       window.dispatchEvent(new CustomEvent('mindar-loaded'));
     } catch (err) {
-      console.warn('MindAR loading warning (will use spatial fallback):', err);
+      console.warn('MindAR loading warning:', err);
     }
   </script>
 </head>
@@ -28,7 +28,6 @@
 
   <!-- CAMERA -->
   <video id="camera-video" autoplay playsinline muted></video>
-  <div id="mock-bg"><div class="grid"></div></div>
 
   <div id="ar-stage">
 
@@ -90,7 +89,6 @@
           2. При предупреждении браузера нажмите <b>«Дополнительно» / «Подробнее» ➔ «Перейти на сайт»</b>.<br>
           3. Нажмите <b>«Разрешить»</b> доступ к камере!
         </div>
-        <button id="btn-skip-https" class="ar-btn-secondary">Остаться на виртуальном фоне</button>
       </div>
     </div>
 
@@ -106,7 +104,6 @@
           <span>📸</span>
           <span>Разрешить камеру</span>
         </button>
-        <button id="btn-mock-mode" class="ar-btn-secondary">Играть на виртуальном фоне</button>
         <div id="camera-gate-error" class="ar-status-error"></div>
       </div>
     </div>
@@ -128,7 +125,6 @@
             <div class="ar-target-icon">🖼️</div>
             <div class="ar-target-title">Наведите камеру на афишу</div>
             <div class="ar-target-desc">Держите афишу фильма в рамке, чтобы оживить сказочный мир</div>
-            <button id="btn-force-poster" class="ar-target-btn">✨ Проверить без афиши</button>
           </div>
         </div>
 
