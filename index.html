@@ -590,7 +590,7 @@
             <div class="ar-target-icon">🖼️</div>
             <div class="ar-target-title">Наведите камеру на афишу</div>
             <div class="ar-target-desc">Держите афишу фильма в рамке, чтобы оживить сказочный мир</div>
-            <button id="btn-force-poster" class="ar-target-btn">✨ Оживить афишу</button>
+            <button id="btn-force-poster" class="ar-target-btn">✨ Проверить без афиши</button>
           </div>
         </div>
 
@@ -1052,7 +1052,7 @@
   let witchCottageGroup, witchLegsGroup, starSparklesPoints;
   let tornadoGroup, tornadoRings = [], vortexParticles, vortexParticleData = [];
   let windRibbons = [], debrisList = [], groundSwirlMesh, vortexLight;
-  let houseGroup, houseShutters = [];
+  let houseGroup, cabin, houseShutters = [];
   let dustBurstPuffs = [];
   let starSparkleData = [];
 
@@ -1071,8 +1071,8 @@
 
   // MR Dynamic Floor & Obstacle Terrain System
   let floorContactMesh = null;
-  let groundElevationCurrent = 0.0;
-  let groundElevationTarget  = 0.0;
+  let groundElevationCurrent = -0.78;
+  let groundElevationTarget  = -0.78;
   let tornadoSquashCurrent   = 1.0;
   let tornadoSquashTarget    = 1.0;
 
@@ -1083,15 +1083,15 @@
   let tornadoState = 'WAITING_FOR_POSTER';
   let eruptionStartTime = 0;
   const ERUPTION_DURATION = 2100;
-  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 1.25, -3.22); // глубина внутри афиши
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, 0.0, 0.2);   // место приземления перед камерой
+  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 0.18, -0.35); // глубина внутри афиши
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.78, 0.38); // место приземления перед афишей (стол/пол)
   let tornadoVel = new THREE.Vector3(0, 0, 0);
   let isAimedAtPoster = false;
   let posterEncounterTriggered = false;
   let aimHoldTime = 0.0;
 
-  // Базовый масштаб урагана для MR (помещается в комнате и на столе в поле зрения)
-  const TORNADO_BASE_SCALE = 0.32;
+  // Базовый масштаб урагана для MR (компактный вихрь на столе/полу в поле зрения)
+  const TORNADO_BASE_SCALE = 0.16;
 
   // Гироскоп и ориентация камеры смартфона (~-18° естественный наклон камеры на пол/стол)
   let gyroActive = false;
@@ -1126,9 +1126,9 @@
     const h = threeCont.clientHeight || window.innerHeight;
     const aspect = w / h;
 
-    tCamera = new THREE.PerspectiveCamera(aspect < 1 ? 55 : 46, aspect, 0.1, 100);
-    tCamera.position.set(0, 1.25, 2.0);
-    tCamera.rotation.set(-0.32, 0, 0);
+    tCamera = new THREE.PerspectiveCamera(aspect < 1 ? 55 : 46, aspect, 0.05, 100);
+    tCamera.position.set(0, 0, 0);
+    tCamera.rotation.set(0, 0, 0);
 
     tRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     tRenderer.setSize(w, h);
@@ -1141,25 +1141,31 @@
     tClock = new THREE.Clock();
 
     // 2. Lighting
-    const hemiLight = new THREE.HemisphereLight(0xdcfce7, 0x1e293b, 0.88);
+    const hemiLight = new THREE.HemisphereLight(0xdcfce7, 0x1e293b, 1.0);
     hemiLight.position.set(0, 15, 0);
     tScene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.35);
-    dirLight.position.set(6, 12, 7);
+    const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.4);
+    dirLight.position.set(3, 8, 5);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
     tScene.add(dirLight);
 
-    vortexLight = new THREE.PointLight(0x38bdf8, 1.3, 8);
-    vortexLight.position.set(-0.6, 2.2, 0);
-    tScene.add(vortexLight);
-
-    // 3. Root Group for diorama
+    // 3. Root Group for diorama (anchored directly to physical poster target via MindAR)
     dioramaGroup = new THREE.Group();
     dioramaGroup.name = "AR_Poster_Clearing_Diorama";
+    dioramaGroup.matrixAutoUpdate = false;
+    dioramaGroup.visible = false;
     tScene.add(dioramaGroup);
+
+    vortexLight = new THREE.PointLight(0x38bdf8, 1.5, 4.0);
+    vortexLight.position.set(0, 0.5, 0.2);
+    dioramaGroup.add(vortexLight);
+
+    const fairyLight = new THREE.PointLight(0x84cc16, 1.2, 2.5);
+    fairyLight.position.set(0.04, 0.25, -0.05);
+    dioramaGroup.add(fairyLight);
 
     // 4. Procedural Textures & 3D Objects
     generateAllTextures();
@@ -1185,12 +1191,13 @@
     tornadoState = 'WAITING_FOR_POSTER';
     if (tornadoGroup) {
       tornadoGroup.position.copy(TORNADO_POSTER_POS);
-      tornadoGroup.scale.setScalar(0.04);
+      tornadoGroup.scale.setScalar(0.02);
       tornadoGroup.visible = false;
     }
     if (houseGroup) houseGroup.visible = false;
     if (floorContactMesh) floorContactMesh.visible = false;
     if (posterGroup) posterGroup.visible = false;
+    if (dioramaGroup) dioramaGroup.visible = false;
     swipeCount = 0;
     posterEncounterTriggered = false;
     aimHoldTime = 0.0;
@@ -1203,14 +1210,18 @@
     if (!tCamera || !tRenderer || !threeCont) return;
     const w = threeCont.clientWidth || window.innerWidth;
     const h = threeCont.clientHeight || window.innerHeight;
-    const aspect = w / h;
-    tCamera.aspect = aspect;
-    tCamera.fov = aspect < 1 ? 55 : 46;
-    tCamera.updateProjectionMatrix();
     tRenderer.setSize(w, h);
     if (swipeTrailEl) {
       swipeTrailEl.width = w;
       swipeTrailEl.height = h;
+    }
+    if (mindarController && opticalTrackingInitialized) {
+      updateCameraProjection();
+    } else {
+      const aspect = w / h;
+      tCamera.aspect = aspect;
+      tCamera.fov = aspect < 1 ? 55 : 46;
+      tCamera.updateProjectionMatrix();
     }
   }
 
@@ -1424,42 +1435,51 @@
 
   // ─── POSTER BASE & ENCHANTED CLEARING (3D DIORAMA DEPTH PORTAL) ───
   function createPosterAndClearing() {
-    // 1. Афиша фильма в AR
+    // 1. Афиша фильма в AR — привязана к плоскости афиши (Z=0)
     posterGroup = new THREE.Group();
     posterGroup.name = "AR_PosterTarget";
-    posterGroup.position.set(0, 1.25, -2.8);
-    posterGroup.rotation.x = -0.04;
-    posterGroup.visible = false; // Скрыта по умолчанию! Появляется СТРОГО при наведении на афишу!
+    posterGroup.position.set(0, 0, 0);
+    posterGroup.rotation.set(0, 0, 0);
+    posterGroup.visible = false;
 
-    // 1. Внешняя золотая рама картины/афиши (на плоскости стены)
-    const frameW = 2.44, frameH = 3.55, frameD = 0.08, borderThick = 0.12;
-    const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.88, roughness: 0.28 });
+    // Внешняя золотая рама картины/афиши (на плоскости афиши Z=0)
+    // Размеры соответствуют нормализованной афише MindAR: ширина 1.02, высота 1.48
+    const frameW = 1.02, frameH = 1.48, frameD = 0.04, borderThick = 0.05;
+    const goldMat = new THREE.MeshStandardMaterial({
+      color: 0xd4af37,
+      metalness: 0.88,
+      roughness: 0.25
+    });
 
     // Верхняя и нижняя планки
     const hBarGeo = new THREE.BoxGeometry(frameW, borderThick, frameD);
     const topBar = new THREE.Mesh(hBarGeo, goldMat);
-    topBar.position.set(0, frameH / 2 - borderThick / 2, 0);
+    topBar.position.set(0, frameH / 2 - borderThick / 2, frameD / 2);
     posterGroup.add(topBar);
 
     const btmBar = new THREE.Mesh(hBarGeo, goldMat);
-    btmBar.position.set(0, -frameH / 2 + borderThick / 2, 0);
+    btmBar.position.set(0, -frameH / 2 + borderThick / 2, frameD / 2);
     posterGroup.add(btmBar);
 
     // Левая и правая планки
     const vBarGeo = new THREE.BoxGeometry(borderThick, frameH - borderThick * 2, frameD);
     const leftBar = new THREE.Mesh(vBarGeo, goldMat);
-    leftBar.position.set(-frameW / 2 + borderThick / 2, 0, 0);
+    leftBar.position.set(-frameW / 2 + borderThick / 2, 0, frameD / 2);
     posterGroup.add(leftBar);
 
     const rightBar = new THREE.Mesh(vBarGeo, goldMat);
-    rightBar.position.set(frameW / 2 - borderThick / 2, 0, 0);
+    rightBar.position.set(frameW / 2 - borderThick / 2, 0, frameD / 2);
     posterGroup.add(rightBar);
 
     // 2. Внутренние скошенные стенки глубины портала (3D Depth Recess)
-    const recessDepth = 0.42;
-    const innerW = frameW - borderThick * 2;
-    const innerH = frameH - borderThick * 2;
-    const portalWallMat = new THREE.MeshStandardMaterial({ color: 0x052e16, roughness: 0.85 });
+    const recessDepth = 0.22;
+    const innerW = frameW - borderThick * 2; // 0.92
+    const innerH = frameH - borderThick * 2; // 1.38
+    const portalWallMat = new THREE.MeshStandardMaterial({
+      color: 0x052e16,
+      roughness: 0.85,
+      side: THREE.DoubleSide
+    });
 
     const leftWallGeo = new THREE.PlaneGeometry(recessDepth, innerH);
     leftWallGeo.rotateY(Math.PI / 2);
@@ -1487,118 +1507,126 @@
 
     // 3. Заднее полотно афиши на глубине recessDepth
     const backGeo = new THREE.PlaneGeometry(innerW, innerH);
-    const backMat = new THREE.MeshStandardMaterial({ map: posterTexture, roughness: 0.65 });
+    const backMat = new THREE.MeshStandardMaterial({
+      map: posterTexture,
+      roughness: 0.65,
+      side: THREE.FrontSide
+    });
     posterMesh = new THREE.Mesh(backGeo, backMat);
     posterMesh.position.set(0, 0, -recessDepth);
     posterGroup.add(posterMesh);
 
+    // Подгружаем реальный постер poster.png в текстуру
+    new THREE.TextureLoader().load('poster.png', (tex) => {
+      tex.encoding = THREE.sRGBEncoding;
+      if (posterMesh) {
+        posterMesh.material.map = tex;
+        posterMesh.material.needsUpdate = true;
+      }
+    });
+
     // 4. Сказочное поле (clearingGroup) — перекрывает задник в глубине афиши
     clearingGroup = new THREE.Group();
     clearingGroup.name = "PosterFairytaleMeadow";
-    clearingGroup.position.set(0, 0, -recessDepth + 0.02);
+    clearingGroup.position.set(0, 0, -recessDepth + 0.01);
 
     // Зелёное поле
     const fieldGeo = new THREE.PlaneGeometry(innerW * 0.98, innerH * 0.98);
-    const fieldMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.82, flatShading: true });
+    const fieldMat = new THREE.MeshStandardMaterial({
+      color: 0x16a34a,
+      roughness: 0.82,
+      flatShading: true
+    });
     const fieldMesh = new THREE.Mesh(fieldGeo, fieldMat);
     clearingGroup.add(fieldMesh);
 
     // Дорожка из жёлтого кирпича через поле
-    const pathGeo = new THREE.PlaneGeometry(0.55, 2.4);
-    const pathMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.75 });
+    const pathGeo = new THREE.PlaneGeometry(0.22, 1.25);
+    const pathMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.72 });
     const pathMesh = new THREE.Mesh(pathGeo, pathMat);
-    pathMesh.position.set(0.12, -0.55, 0.02);
-    pathMesh.rotation.z = -0.12;
+    pathMesh.position.set(0.06, -0.25, 0.01);
+    pathMesh.rotation.z = -0.10;
     clearingGroup.add(pathMesh);
 
     // Сказочные полевые цветы
     const flowerColors = [0xef4444, 0xfde047, 0x38bdf8, 0xc084fc, 0xffffff];
-    const flowerGeo = new THREE.DodecahedronGeometry(0.04, 0);
-    for (let f = 0; f < 32; f++) {
+    const flowerGeo = new THREE.DodecahedronGeometry(0.016, 0);
+    for (let f = 0; f < 36; f++) {
       const col = flowerColors[f % flowerColors.length];
       const flMat = new THREE.MeshBasicMaterial({ color: col });
       const flower = new THREE.Mesh(flowerGeo, flMat);
-      const fx = (Math.random() - 0.5) * (innerW * 0.85);
-      const fy = (Math.random() - 0.5) * (innerH * 0.85);
-      flower.position.set(fx, fy, 0.03);
+      const fx = (Math.random() - 0.5) * (innerW * 0.86);
+      const fy = (Math.random() - 0.5) * (innerH * 0.86);
+      flower.position.set(fx, fy, 0.015);
       clearingGroup.add(flower);
     }
 
     // Декоративные деревца
     function addPosterTree(x, y, scale = 1.0) {
       const tg = new THREE.Group();
-      tg.position.set(x, y, 0.03);
+      tg.position.set(x, y, 0.01);
       const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04 * scale, 0.06 * scale, 0.3 * scale, 6),
+        new THREE.CylinderGeometry(0.018 * scale, 0.025 * scale, 0.12 * scale, 6),
         new THREE.MeshStandardMaterial({ color: 0x5c2d0c, roughness: 0.9 })
       );
-      trunk.position.y = 0.15 * scale;
+      trunk.position.y = 0.06 * scale;
       tg.add(trunk);
       const crown = new THREE.Mesh(
-        new THREE.ConeGeometry(0.25 * scale, 0.65 * scale, 7),
+        new THREE.ConeGeometry(0.10 * scale, 0.28 * scale, 7),
         new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75, flatShading: true })
       );
-      crown.position.y = 0.5 * scale;
+      crown.position.y = 0.20 * scale;
       crown.castShadow = true;
       tg.add(crown);
       clearingGroup.add(tg);
     }
-    addPosterTree(-0.85, -0.7, 0.85);
-    addPosterTree(0.85, -0.5, 0.9);
-    addPosterTree(-0.8, 0.85, 0.75);
+    addPosterTree(-0.35, -0.32, 0.9);
+    addPosterTree(0.35, -0.22, 1.0);
+    addPosterTree(-0.32, 0.42, 0.8);
 
     posterGroup.add(clearingGroup);
     dioramaGroup.add(posterGroup);
-
-    // 5. Невидимая плоскость теней реального пола
-    const floorShadowGeo = new THREE.PlaneGeometry(35, 35);
-    floorShadowGeo.rotateX(-Math.PI / 2);
-    const floorShadowMat = new THREE.ShadowMaterial({ opacity: 0.38 });
-    const floorShadowMesh = new THREE.Mesh(floorShadowGeo, floorShadowMat);
-    floorShadowMesh.position.y = 0;
-    floorShadowMesh.receiveShadow = true;
-    dioramaGroup.add(floorShadowMesh);
   }
 
   // ─── WICKED WITCH'S CROOKED COTTAGE & SHOES ──────────
   function createWitchCottage() {
     witchCottageGroup = new THREE.Group();
     witchCottageGroup.name = "WickedWitchCottage";
-    // Расположен прямо на афише, перекрывая её
-    witchCottageGroup.position.set(0, 0.40, 0.08);
+    // Расположен прямо на полянке в глубине афиши
+    witchCottageGroup.position.set(0.05, 0.18, 0.04);
 
     const witchMatWalls = new THREE.MeshStandardMaterial({ color: 0x3d1a3b, roughness: 0.85 });
     const witchMatRoof  = new THREE.MeshStandardMaterial({ map: witchRoofTexture, roughness: 0.85 });
     const witchMatStone = new THREE.MeshStandardMaterial({ map: stoneWallTexture, roughness: 0.9 });
-    const witchGlowMat  = new THREE.MeshStandardMaterial({ color: 0xbef264, emissive: 0x84cc16, emissiveIntensity: 0.9 });
+    const witchGlowMat  = new THREE.MeshStandardMaterial({ color: 0xbef264, emissive: 0x84cc16, emissiveIntensity: 0.95 });
 
     // 1. Каменный цоколь
-    const foundation = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.68, 0.12), witchMatStone);
-    foundation.position.set(0, 0, 0.05);
+    const foundation = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.28, 0.06), witchMatStone);
+    foundation.position.set(0, 0, 0.03);
     witchCottageGroup.add(foundation);
 
     // 2. Кривые деревянные стены
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.58, 0.45), witchMatWalls);
-    walls.position.set(0, 0, 0.28);
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.20), witchMatWalls);
+    walls.position.set(0, 0, 0.12);
     walls.rotation.z = -0.06;
     witchCottageGroup.add(walls);
 
     // 3. Заострённая кривая крыша
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.65, 0.75, 4), witchMatRoof);
-    roof.position.set(0.04, 0.48, 0.35);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.34, 4), witchMatRoof);
+    roof.position.set(0.02, 0.20, 0.16);
     roof.rotation.y = Math.PI / 4;
     roof.rotation.z = -0.12;
     witchCottageGroup.add(roof);
 
     // 4. Кривая печная труба с фиолетовым свечением
-    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.38, 0.12), witchMatStone);
-    chimney.position.set(0.24, 0.52, 0.25);
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.06), witchMatStone);
+    chimney.position.set(0.10, 0.24, 0.12);
     chimney.rotation.z = 0.15;
     witchCottageGroup.add(chimney);
 
     // 5. Окошко с жутким зеленоватым светом
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.05), witchGlowMat);
-    win.position.set(0, 0, 0.52);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.03), witchGlowMat);
+    win.position.set(0, 0, 0.22);
     witchCottageGroup.add(win);
 
     clearingGroup.add(witchCottageGroup);
@@ -1606,36 +1634,36 @@
     // 6. Полосатые ножки Ведьмы и Серебряные башмачки
     witchLegsGroup = new THREE.Group();
     witchLegsGroup.name = "WitchStripedLegs";
-    witchLegsGroup.position.set(0, -0.42, 0.18);
+    witchLegsGroup.position.set(0.05, -0.02, 0.08);
 
     const legMat = new THREE.MeshStandardMaterial({ map: stripesTexture, roughness: 0.65 });
     const shoeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.18 });
     const rubyMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
 
-    [-0.14, 0.14].forEach((lx, idx) => {
+    [-0.06, 0.06].forEach((lx) => {
       const legSub = new THREE.Group();
       legSub.position.set(lx, 0, 0);
 
       // Чулки
-      const legGeo = new THREE.CylinderGeometry(0.035, 0.038, 0.35, 12);
+      const legGeo = new THREE.CylinderGeometry(0.016, 0.018, 0.16, 12);
       legGeo.rotateZ(Math.PI / 2);
       const legMesh = new THREE.Mesh(legGeo, legMat);
       legSub.add(legMesh);
 
       // Серебряный башмачок с загнутым сказочным носком
       const shoeGroup = new THREE.Group();
-      shoeGroup.position.set(0, -0.18, 0.05);
+      shoeGroup.position.set(0, -0.08, 0.02);
 
-      const shoeBody = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, 0.05), shoeMat);
+      const shoeBody = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.07, 0.025), shoeMat);
       shoeGroup.add(shoeBody);
 
-      const toeTip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.08, 8), shoeMat);
+      const toeTip = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.04, 8), shoeMat);
       toeTip.rotation.x = -Math.PI / 3;
-      toeTip.position.set(0, -0.06, 0.05);
+      toeTip.position.set(0, -0.03, 0.025);
       shoeGroup.add(toeTip);
 
-      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.02), rubyMat);
-      buckle.position.set(0, 0.01, 0.04);
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.015, 0.01), rubyMat);
+      buckle.position.set(0, 0.005, 0.02);
       shoeGroup.add(buckle);
 
       legSub.add(shoeGroup);
@@ -1717,8 +1745,8 @@
     groundSwirlMesh.position.y = 0.32;
     tornadoGroup.add(groundSwirlMesh);
 
-    // Абразивный диск контакта с реальным полом комнаты (MR Floor Abrasion Contact Decal)
-    const floorContactGeo = new THREE.PlaneGeometry(1.6, 1.6);
+    // Абразивный диск контакта с реальной поверхностью стола/пола
+    const floorContactGeo = new THREE.PlaneGeometry(0.85, 0.85);
     floorContactGeo.rotateX(-Math.PI / 2);
     const floorContactMat = new THREE.MeshBasicMaterial({
       map: floorAbrasionTexture,
@@ -1727,7 +1755,7 @@
       depthWrite: false
     });
     floorContactMesh = new THREE.Mesh(floorContactGeo, floorContactMat);
-    floorContactMesh.position.set(tornadoGroup.position.x, 0.005, tornadoGroup.position.z);
+    floorContactMesh.position.set(tornadoGroup.position.x, TORNADO_ROOM_DEFAULT.y + 0.005, tornadoGroup.position.z);
     floorContactMesh.visible = false;
     dioramaGroup.add(floorContactMesh);
 
@@ -1827,7 +1855,7 @@
     houseGroup.name = "EllieFlyingHouse";
     houseShutters = [];
 
-    const cabin = new THREE.Group();
+    cabin = new THREE.Group();
 
     const wallWoodMat    = new THREE.MeshStandardMaterial({ map: woodPlankTexture, roughness: 0.82, metalness: 0.05 });
     const darkTimberMat  = new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: 0.85 });
@@ -1930,8 +1958,8 @@
     addWindow(-0.505, 0.48, -0.06, -Math.PI / 2);
     addWindow(0.505, 0.48, -0.06, Math.PI / 2);
 
-    cabin.position.y = -0.45;
-    cabin.scale.setScalar(0.45);
+    cabin.position.y = -0.15;
+    cabin.scale.setScalar(0.22);
     houseGroup.add(cabin);
     houseGroup.visible = false;
     dioramaGroup.add(houseGroup);
@@ -2107,6 +2135,42 @@
   let opticalTargetMatrix = null;
   let opticalLastSeenTime = 0;
   let opticalTrackingInitialized = false;
+  let postMatrices = [];
+
+  function updateCameraProjection() {
+    if (!mindarController || !tCamera) return;
+    const proj = mindarController.getProjectionMatrix();
+    if (!proj) return;
+    const containerW = threeCont ? (threeCont.clientWidth || window.innerWidth) : window.innerWidth;
+    const containerH = threeCont ? (threeCont.clientHeight || window.innerHeight) : window.innerHeight;
+    const vW = (camVideo && camVideo.videoWidth) ? camVideo.videoWidth : 640;
+    const vH = (camVideo && camVideo.videoHeight) ? camVideo.videoHeight : 480;
+    const containerAspect = containerW / containerH;
+
+    const c = mindarController.inputWidth / mindarController.inputHeight;
+    let d;
+    if (c > containerAspect) {
+      d = vW / mindarController.inputWidth;
+    } else {
+      d = vH / mindarController.inputHeight;
+    }
+    let h;
+    if (c > containerAspect) {
+      h = containerH * d;
+    } else {
+      h = (containerW / mindarController.inputWidth) * mindarController.inputHeight * d;
+    }
+    const g = containerH / h;
+    const fov = 2 * Math.atan((1 / proj[5]) * g) * (180 / Math.PI);
+    const near = proj[14] / (proj[10] - 1);
+    const far = proj[14] / (proj[10] + 1);
+
+    tCamera.fov = fov;
+    tCamera.near = Math.max(0.01, Math.min(near, 0.1));
+    tCamera.far = Math.max(100, far);
+    tCamera.aspect = containerAspect;
+    tCamera.updateProjectionMatrix();
+  }
 
   async function initOpticalTracking(videoEl) {
     if (opticalTrackingInitialized || !videoEl) return;
@@ -2140,25 +2204,72 @@
               opticalTargetDetected = true;
               opticalTargetMatrix = data.worldMatrix;
               opticalLastSeenTime = performance.now();
+
+              // Матрица трансформации относительно камеры
+              const m = new THREE.Matrix4().fromArray(data.worldMatrix);
+              if (postMatrices && postMatrices[data.targetIndex || 0]) {
+                m.multiply(postMatrices[data.targetIndex || 0]);
+              }
+
+              if (dioramaGroup) {
+                dioramaGroup.matrix.copy(m);
+                dioramaGroup.matrixAutoUpdate = false;
+                dioramaGroup.matrixWorldNeedsUpdate = true;
+                dioramaGroup.visible = true;
+              }
+              if (posterGroup) {
+                posterGroup.visible = true;
+              }
+
               if (tornadoState === 'WAITING_FOR_POSTER') {
                 triggerPosterEncounter();
               }
             } else {
               opticalTargetDetected = false;
-              opticalTargetMatrix = null;
+              // Если ураган ещё не найден, скрываем рамку афиши до обнаружения
+              if (tornadoState === 'WAITING_FOR_POSTER') {
+                if (dioramaGroup) dioramaGroup.visible = false;
+              }
             }
           }
         }
       });
 
       console.log('[OpticalAR] Loading targets.mind...');
-      await mindarController.addImageTargets('targets.mind?v=' + Date.now());
-      console.log('[OpticalAR] Target compiled data loaded! Beginning continuous video tracking...');
+      const targetRes = await mindarController.addImageTargets('targets.mind?v=' + Date.now());
+      console.log('[OpticalAR] Target compiled data loaded! Result:', targetRes);
+
+      const dimensions = targetRes && targetRes.dimensions ? targetRes.dimensions : [[1, 1.48026]];
+      postMatrices = [];
+      for (let n = 0; n < dimensions.length; n++) {
+        const [p, m] = dimensions[n];
+        const u = new THREE.Vector3(p / 2, p / 2 + (m - p) / 2, 0);
+        const o = new THREE.Quaternion();
+        const l = new THREE.Vector3(p, p, p);
+        const c = new THREE.Matrix4().compose(u, o, l);
+        postMatrices.push(c);
+      }
+
+      updateCameraProjection();
+      console.log('[OpticalAR] Camera projection synchronized! Beginning continuous video tracking...');
       mindarController.processVideo(videoEl);
       opticalTrackingInitialized = true;
     } catch (err) {
       console.warn('[OpticalAR] Failed to start optical tracking:', err);
     }
+  }
+
+  function setupFallbackDioramaPose() {
+    if (dioramaGroup) {
+      dioramaGroup.position.set(0, 0.08, -1.25);
+      dioramaGroup.rotation.set(-0.12, 0, 0);
+      dioramaGroup.scale.setScalar(1.0);
+      dioramaGroup.updateMatrix();
+      dioramaGroup.matrixAutoUpdate = false;
+      dioramaGroup.matrixWorldNeedsUpdate = true;
+      dioramaGroup.visible = true;
+    }
+    if (posterGroup) posterGroup.visible = true;
   }
 
   let warningHideTimer = null;
@@ -2183,6 +2294,10 @@
     posterEncounterTriggered = true;
 
     // 1. Афиша оживает! Показываем 3D портал с поляной и домиком ведьмы в глубине
+    if (!opticalTargetDetected) {
+      setupFallbackDioramaPose();
+    }
+    if (dioramaGroup) dioramaGroup.visible = true;
     if (posterGroup) posterGroup.visible = true;
     doFlash('rgba(0, 255, 162, 0.7)', 350);
     sfx.chime();
@@ -2201,9 +2316,9 @@
     tornadoState = 'ERUPTING';
     eruptionStartTime = performance.now();
 
-    // Начало движения: глубоко внутри афиши (0, 1.25, -3.22)
+    // Начало движения: глубоко внутри афиши (TORNADO_POSTER_POS)
     tornadoGroup.position.copy(TORNADO_POSTER_POS);
-    tornadoGroup.scale.setScalar(0.04);
+    tornadoGroup.scale.setScalar(0.02);
     tornadoGroup.visible = true;
 
     // Домик и контактный след пока скрыты
@@ -2399,11 +2514,12 @@
     houseFlight.startPos.copy(houseGroup.position);
     houseFlight.startRot.copy(houseGroup.rotation);
 
-    // Цель — реальные 3D координаты избушки Ведьмы на афише
-    if (witchCottageGroup) {
+    // Цель — реальные 3D координаты избушки Ведьмы на афише внутри dioramaGroup
+    if (witchCottageGroup && dioramaGroup) {
       witchCottageGroup.getWorldPosition(houseFlight.targetPos);
+      dioramaGroup.worldToLocal(houseFlight.targetPos);
     } else {
-      houseFlight.targetPos.set(0, 1.6, -2.7);
+      houseFlight.targetPos.set(0.05, 0.18, -0.18);
     }
   }
 
@@ -2450,15 +2566,26 @@
     const dt = Math.min(tClock ? tClock.getDelta() : 0.016, 0.05);
     const elapsed = tClock ? tClock.getElapsedTime() : (time * 0.001);
 
-    // Обновление ориентации камеры от гироскопа / drag
+    // Обновление ориентации камеры:
+    // Если запущена реальная камера AR с MindAR — камера в (0,0,0) без поворота,
+    // так как 6DOF матрица цели уже преобразует сцену.
+    // Если камера выключена (fallback mock) — используем гироскоп / drag.
     if (tCamera) {
-      tCamera.rotation.x = THREE.MathUtils.lerp(tCamera.rotation.x, camGyroPitch, dt * 6);
-      tCamera.rotation.y = THREE.MathUtils.lerp(tCamera.rotation.y, camGyroYaw, dt * 6);
+      if (!cameraActive) {
+        tCamera.rotation.x = THREE.MathUtils.lerp(tCamera.rotation.x, camGyroPitch, dt * 6);
+        tCamera.rotation.y = THREE.MathUtils.lerp(tCamera.rotation.y, camGyroYaw, dt * 6);
+      } else {
+        tCamera.position.set(0, 0, 0);
+        tCamera.rotation.set(0, 0, 0);
+      }
     }
 
-    // 0. Поляна с домиком Ведьмы отображается СТРОГО при наведении на афишу
-    if (posterGroup) {
-      posterGroup.visible = (posterEncounterTriggered === true || opticalTargetDetected === true || houseState === 'LAUNCHING' || houseState === 'LANDED');
+    // 0. Поляна с домиком Ведьмы отображается при наведении на афишу
+    if (dioramaGroup) {
+      if (posterEncounterTriggered || opticalTargetDetected || houseState === 'LAUNCHING' || houseState === 'LANDED') {
+        dioramaGroup.visible = true;
+        if (posterGroup) posterGroup.visible = true;
+      }
     }
 
     // 1. Логика появления и движения урагана
@@ -2467,7 +2594,7 @@
       const aimed = checkAimAtPoster();
       if (aimed) {
         aimHoldTime += dt;
-        if (aimHoldTime >= 0.40) {
+        if (aimHoldTime >= 0.35) {
           triggerPosterEncounter();
         }
       } else {
@@ -2477,31 +2604,29 @@
       const ep = Math.min(1.0, (time - eruptionStartTime) / ERUPTION_DURATION);
       const ease = 1 - Math.pow(1 - ep, 3); // кубический ease-out
 
-      // Вылет из глубины афиши (TORNADO_POSTER_POS) на пол/стол перед камерой
-      const targetRoomPos = new THREE.Vector3(0, groundElevationCurrent, 0.2);
-      tornadoGroup.position.lerpVectors(TORNADO_POSTER_POS, targetRoomPos, ease);
-      tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.55;
+      // Вылет из глубины афиши (TORNADO_POSTER_POS) на стол/пол перед афишей (TORNADO_ROOM_DEFAULT)
+      tornadoGroup.position.lerpVectors(TORNADO_POSTER_POS, TORNADO_ROOM_DEFAULT, ease);
+      tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.28;
 
-      const currentScale = THREE.MathUtils.lerp(0.04, TORNADO_BASE_SCALE, ease);
+      const currentScale = THREE.MathUtils.lerp(0.02, TORNADO_BASE_SCALE, ease);
       tornadoGroup.scale.setScalar(currentScale);
       tornadoGroup.rotation.y += dt * 14.0;
 
       // Домик появляется в середине вылета (захвачен вихрем)
-      if (ep > 0.40 && !houseGroup.visible) {
+      if (ep > 0.35 && !houseGroup.visible) {
         houseGroup.visible = true;
-        cabin.scale.setScalar(0.45);
       }
 
       if (ep >= 1.0) {
-        // Ураган приземлился на пол/стол! Теперь с ним можно взаимодействовать!
+        // Ураган приземлился на поверхность! Теперь с ним можно взаимодействовать!
         tornadoState = 'ROAMING';
-        tornadoGroup.position.copy(targetRoomPos);
+        tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
         tornadoGroup.scale.setScalar(TORNADO_BASE_SCALE);
 
         // Появляется след контакта с поверхностью
         if (floorContactMesh) {
           floorContactMesh.visible = true;
-          floorContactMesh.position.set(tornadoGroup.position.x, groundElevationCurrent + 0.005, tornadoGroup.position.z);
+          floorContactMesh.position.set(tornadoGroup.position.x, TORNADO_ROOM_DEFAULT.y + 0.005, tornadoGroup.position.z);
         }
 
         // Выброс пыли и звуковой удар от касания поверхности
@@ -2509,54 +2634,20 @@
         sfx.tada();
 
         const banner = $('swipe-hint-text');
-        if (banner) banner.textContent = '🌪️ Ураган на полу! Смахните его в сторону афиши!';
+        if (banner) banner.textContent = '🌪️ Ураган на столе! Смахните его в сторону афиши!';
       }
     } else if (tornadoState === 'ROAMING' && !tornadoBlowAway) {
-      // 1. Плавное естественное покачивание урагана по поверхности
-      tornadoVel.x += Math.sin(elapsed * 1.5) * 0.005;
-      tornadoVel.z += Math.cos(elapsed * 1.2) * 0.005;
+      // 1. Плавное естественное покачивание урагана по поверхности стола/пола
+      tornadoVel.x += Math.sin(elapsed * 1.5) * 0.003;
+      tornadoVel.z += Math.cos(elapsed * 1.2) * 0.003;
       tornadoGroup.position.x += tornadoVel.x * dt;
       tornadoGroup.position.z += tornadoVel.z * dt;
       tornadoVel.multiplyScalar(0.92);
 
-      // 2. Адаптация высоты (Пол 0м, стул/бордюр ~0.4м, стол ~0.75м)
-      // Если телефон направлен круто вниз (камера смотрит под ноги в пол) — автоматически пол
-      if (camGyroPitch < -0.75) {
-        groundElevationTarget = 0.0;
-      }
-      groundElevationCurrent = THREE.MathUtils.lerp(groundElevationCurrent, groundElevationTarget, dt * 5.0);
-      tornadoGroup.position.y = groundElevationCurrent;
-
-      // 3. Удержание урагана в поле зрения камеры (по центру вихря, а не подошве)
-      if (tCamera) {
-        const centerPos = tornadoGroup.position.clone();
-        centerPos.y += 0.55;
-        const sp = centerPos.project(tCamera);
-
-        if (sp.x > 0.72) {
-          tornadoVel.x = -Math.abs(tornadoVel.x) * 0.7 - 0.35;
-          triggerObstacleImpact(tornadoGroup.position, new THREE.Vector3(-1, 0, 0));
-        } else if (sp.x < -0.72) {
-          tornadoVel.x = Math.abs(tornadoVel.x) * 0.7 + 0.35;
-          triggerObstacleImpact(tornadoGroup.position, new THREE.Vector3(1, 0, 0));
-        }
-
-        if (sp.y < -0.65) {
-          tornadoVel.z = -Math.abs(tornadoVel.z) * 0.7 - 0.35;
-        } else if (sp.y > 0.65) {
-          tornadoVel.z = Math.abs(tornadoVel.z) * 0.7 + 0.35;
-        }
-      }
-
-      // Безопасные границы вокруг пользователя (в пределах видимости)
-      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -1.2, 1.2);
-      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -0.6, 0.7);
-
-      // Фэйлсейф сброс, если ураган улетел слишком далеко
-      if (tornadoGroup.position.distanceTo(tCamera.position) > 4.0 || isNaN(tornadoGroup.position.x)) {
-        tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
-        tornadoVel.set(0, 0, 0);
-      }
+      // Удержание в границах перед афишей
+      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.45, 0.45);
+      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, 0.15, 0.65);
+      tornadoGroup.position.y = TORNADO_ROOM_DEFAULT.y;
 
       // Проверка прицеливания на афишу в реальном времени
       isAimedAtPoster = checkAimAtPoster();
@@ -2582,15 +2673,15 @@
       if (groundSwirlMesh) groundSwirlMesh.material.opacity = tornadoOpacity * 0.45;
       if (vortexParticles) vortexParticles.material.opacity = tornadoOpacity * 0.55;
       if (floorContactMesh) floorContactMesh.material.opacity = tornadoOpacity * 0.85;
-    } else {
+    } else if (tornadoState === 'ROAMING') {
       tornadoGroup.scale.set(TORNADO_BASE_SCALE * invSq, TORNADO_BASE_SCALE * tornadoSquashCurrent, TORNADO_BASE_SCALE * invSq);
       tornadoGroup.rotation.z = tornadoTiltCurrent.z;
       tornadoGroup.rotation.x = tornadoTiltCurrent.x;
     }
 
-    // Абразивный диск контакта с поверхностью (пол, стул, стол)
+    // Абразивный диск контакта с поверхностью (стол, пол)
     if (floorContactMesh) {
-      floorContactMesh.position.set(tornadoGroup.position.x, groundElevationCurrent + 0.005, tornadoGroup.position.z);
+      floorContactMesh.position.set(tornadoGroup.position.x, TORNADO_ROOM_DEFAULT.y + 0.005, tornadoGroup.position.z);
       floorContactMesh.rotation.y += spinRate * 2.0;
       floorContactMesh.scale.setScalar((tornadoGroup.scale.x / TORNADO_BASE_SCALE) * (0.96 + Math.sin(elapsed * 5.0) * 0.05));
       if (!tornadoBlowAway) {
@@ -2599,7 +2690,7 @@
     }
 
     if (vortexLight) {
-      vortexLight.position.set(tornadoGroup.position.x, tornadoGroup.position.y + 0.85, tornadoGroup.position.z);
+      vortexLight.position.set(tornadoGroup.position.x, tornadoGroup.position.y + 0.45, tornadoGroup.position.z);
     }
 
     const spinRate = (4.8 * tornadoSpeedMult) * dt;
@@ -2645,18 +2736,18 @@
     if (houseState === 'ORBITING') {
       const orbitSpeed = (2.5 * tornadoSpeedMult) * dt;
       const hAngle = elapsed * 2.2 * tornadoSpeedMult;
-      const orbitR = 0.65;
-      const bobY = Math.sin(elapsed * 4.2) * 0.08;
+      const orbitR = 0.24;
+      const bobY = Math.sin(elapsed * 4.2) * 0.03;
 
       houseGroup.position.set(
         tornadoGroup.position.x + Math.cos(hAngle) * orbitR,
-        tornadoGroup.position.y + 0.95 + bobY,
+        tornadoGroup.position.y + 0.38 + bobY,
         tornadoGroup.position.z + Math.sin(hAngle) * orbitR
       );
 
       houseGroup.rotation.y = -hAngle + Math.PI / 4;
-      houseGroup.rotation.z = Math.sin(elapsed * 4.8) * 0.28 + 0.18;
-      houseGroup.rotation.x = Math.cos(elapsed * 4.2) * 0.22;
+      houseGroup.rotation.z = Math.sin(elapsed * 4.8) * 0.22 + 0.14;
+      houseGroup.rotation.x = Math.cos(elapsed * 4.2) * 0.18;
 
       // Ставни качаются от ветра
       houseShutters.forEach(sh => {
@@ -2673,7 +2764,7 @@
 
       // Параболическая траектория
       const linearY = THREE.MathUtils.lerp(houseFlight.startPos.y, houseFlight.targetPos.y, p * p);
-      const arcLift = Math.sin(p * Math.PI) * 2.2;
+      const arcLift = Math.sin(p * Math.PI) * 0.45;
       houseGroup.position.y = linearY + arcLift;
 
       // Вращение и выравнивание
