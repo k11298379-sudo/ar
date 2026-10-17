@@ -6,6 +6,16 @@
   <title>Волшебник Изумрудного Города — AR</title>
   <script src="assets/three.min.js"></script>
   <script src="assets/qrcode.min.js"></script>
+  <script type="module">
+    try {
+      const { Controller } = await import('https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js');
+      window.MindARController = Controller;
+      console.log('✅ MindAR Optical Image Tracking engine ready!');
+      window.dispatchEvent(new CustomEvent('mindar-loaded'));
+    } catch (err) {
+      console.warn('MindAR loading warning (will use spatial fallback):', err);
+    }
+  </script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -869,6 +879,10 @@
       if (httpsModal) httpsModal.style.display = 'none';
       btnCam.style.borderColor = '#00ffa2';
       btnCam.style.boxShadow = '0 0 12px rgba(0,255,162,0.6)';
+
+      // Инициализируем оптическое распознавание афиши через MindAR
+      initOpticalTracking(camVideo);
+
       return true;
     } catch (err) {
       console.warn('Camera error:', err);
@@ -1172,6 +1186,10 @@
     setupSwipeTrailCanvas();
     setupSwipeEvents();
     initGyroscope();
+
+    if (camVideo && camVideo.srcObject) {
+      initOpticalTracking(camVideo);
+    }
 
     window.addEventListener('resize', onThreeResize);
 
@@ -1905,7 +1923,66 @@
     camGyroYaw   = THREE.MathUtils.clamp(-dGamma * 0.85, -0.95, 0.95);
   }
 
+  // ─── OPTICAL IMAGE TRACKING (MINDAR) ─────────────────
+  let mindarController = null;
+  let opticalTargetDetected = false;
+  let opticalTargetMatrix = null;
+  let opticalLastSeenTime = 0;
+  let opticalTrackingInitialized = false;
+
+  async function initOpticalTracking(videoEl) {
+    if (opticalTrackingInitialized || !videoEl) return;
+    if (!window.MindARController) {
+      window.addEventListener('mindar-loaded', () => initOpticalTracking(videoEl), { once: true });
+      return;
+    }
+
+    try {
+      const vWidth = videoEl.videoWidth || 640;
+      const vHeight = videoEl.videoHeight || 480;
+
+      console.log(`[OpticalAR] Starting MindAR Controller (${vWidth}x${vHeight})...`);
+      mindarController = new window.MindARController({
+        inputWidth: vWidth,
+        inputHeight: vHeight,
+        filterMinCF: 0.0001,
+        filterBeta: 1000,
+        warmupTolerance: 2,
+        missTolerance: 6,
+        onUpdate: (data) => {
+          if (data.type === 'updateMatrix') {
+            if (data.worldMatrix !== null) {
+              opticalTargetDetected = true;
+              opticalTargetMatrix = data.worldMatrix;
+              opticalLastSeenTime = performance.now();
+            } else {
+              if (performance.now() - opticalLastSeenTime > 700) {
+                opticalTargetDetected = false;
+                opticalTargetMatrix = null;
+              }
+            }
+          }
+        }
+      });
+
+      console.log('[OpticalAR] Loading targets.mind...');
+      await mindarController.addImageTargets('targets.mind');
+      console.log('[OpticalAR] Target compiled data loaded! Beginning continuous video tracking...');
+      mindarController.processVideo(videoEl);
+      opticalTrackingInitialized = true;
+    } catch (err) {
+      console.warn('[OpticalAR] Failed to start optical tracking:', err);
+    }
+  }
+
   function checkAimAtPoster() {
+    // 1. Приоритет: Оптическое распознавание (MindAR Image Tracking):
+    // Реальная физическая афиша обнаружена объективом камеры!
+    if (opticalTargetDetected) {
+      return true;
+    }
+
+    // 2. Fallback: Пространственный гироскопический трекинг
     if (!posterGroup || !tCamera) return false;
     const wp = new THREE.Vector3();
     posterGroup.getWorldPosition(wp);
@@ -2143,13 +2220,15 @@
       if (arReticle) {
         if (isAimedAtPoster) {
           arReticle.classList.add('aimed');
-          if (arReticleStatus) arReticleStatus.textContent = '🎯 АФИША В ПРИЦЕЛЕ!';
+          if (arReticleStatus) {
+            arReticleStatus.textContent = opticalTargetDetected ? '🎯 АФИША РАСПОЗНАНА В КАМЕРЕ!' : '🎯 АФИША В ПРИЦЕЛЕ!';
+          }
           if (arWarningBanner && arWarningBanner.style.display !== 'none') {
             arWarningBanner.style.display = 'none';
           }
         } else {
           arReticle.classList.remove('aimed');
-          if (arReticleStatus) arReticleStatus.textContent = '🔍 ИЩЕМ АФИШУ...';
+          if (arReticleStatus) arReticleStatus.textContent = '🔍 НАВЕДИТЕСЬ НА АФИШУ...';
         }
       }
     }
