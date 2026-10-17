@@ -1860,7 +1860,7 @@
       });
 
       console.log('[OpticalAR] Loading targets.mind...');
-      await mindarController.addImageTargets('targets.mind');
+      await mindarController.addImageTargets('targets.mind?v=' + Date.now());
       console.log('[OpticalAR] Target compiled data loaded! Beginning continuous video tracking...');
       mindarController.processVideo(videoEl);
       opticalTrackingInitialized = true;
