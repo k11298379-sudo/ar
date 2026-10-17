@@ -524,8 +524,8 @@
 
       if (tornadoGroup) {
         tornadoGroup.position.lerpVectors(window.TORNADO_POSTER_POS, window.TORNADO_ROOM_DEFAULT, ease);
-        tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.16;
-        const currentScale = THREE.MathUtils.lerp(0.02, window.TORNADO_BASE_SCALE, ease);
+        tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.32;
+        const currentScale = THREE.MathUtils.lerp(0.04, window.TORNADO_BASE_SCALE, ease);
         tornadoGroup.scale.setScalar(currentScale);
         tornadoGroup.rotation.y += dt * 14.0;
       }
@@ -553,7 +553,7 @@
         if (window.sfx && window.sfx.tada) window.sfx.tada();
 
         const banner = document.getElementById('swipe-hint-text');
-        if (banner) banner.textContent = '🌪️ Ураган на столе! Смахните его в сторону афиши!';
+        if (banner) banner.textContent = '🌪️ Ураган перед вами! Смахните его в сторону афиши!';
       }
     } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup) {
       tornadoVel.x += Math.sin(elapsed * 1.5) * 0.003;
@@ -562,8 +562,8 @@
       tornadoGroup.position.z += tornadoVel.z * dt;
       tornadoVel.multiplyScalar(0.92);
 
-      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.32, 0.32);
-      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, 0.02, 0.20);
+      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.60, 0.60);
+      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, 0.35, 0.85);
       tornadoGroup.position.y = window.TORNADO_ROOM_DEFAULT.y;
 
       const isAimed = window.checkAimAtPoster ? window.checkAimAtPoster() : true;
@@ -611,7 +611,7 @@
     }
 
     if (vortexLight && tornadoGroup) {
-      vortexLight.position.set(tornadoGroup.position.x, tornadoGroup.position.y + 0.45, tornadoGroup.position.z);
+      vortexLight.position.set(tornadoGroup.position.x, tornadoGroup.position.y + 0.85, tornadoGroup.position.z);
     }
 
     for (let i = 0; i < tornadoRings.length; i++) {
@@ -655,12 +655,12 @@
     // 2. Анимация Домика Элли
     if (houseState === 'ORBITING' && houseGroup && tornadoGroup) {
       const hAngle = elapsed * 2.2 * tornadoSpeedMult;
-      const orbitR = 0.14;
-      const bobY = Math.sin(elapsed * 4.2) * 0.015;
+      const orbitR = 0.48;
+      const bobY = Math.sin(elapsed * 4.2) * 0.035;
 
       houseGroup.position.set(
         tornadoGroup.position.x + Math.cos(hAngle) * orbitR,
-        tornadoGroup.position.y + 0.26 + bobY,
+        tornadoGroup.position.y + 0.62 + bobY,
         tornadoGroup.position.z + Math.sin(hAngle) * orbitR
       );
 
@@ -706,8 +706,8 @@
 
         legsSlide = Math.min(1.0, b * 1.8);
         if (witchLegsGroup) {
-          witchLegsGroup.position.y = -0.42 - legsSlide * 0.14;
-          witchLegsGroup.position.z = 0.18 + legsSlide * 0.22;
+          witchLegsGroup.position.y = 0.04 - legsSlide * 0.06;
+          witchLegsGroup.position.z = 0.08 + legsSlide * 0.14;
         }
       } else {
         houseGroup.position.copy(houseFlight.targetPos);

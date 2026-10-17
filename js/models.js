@@ -6,9 +6,9 @@
   'use strict';
 
   // Константы позиционирования для MR
-  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 0.08, -0.22); // глубина внутри афиши
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.62, 0.10); // место приземления перед афишей (стол/пол)
-  const TORNADO_BASE_SCALE   = 0.16; // базовый масштаб вихря
+  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 0.05, -0.25); // глубина внутри афиши
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.42, 0.65); // вырывается вперед в комнату к пользователю (+Z)
+  const TORNADO_BASE_SCALE   = 0.44; // базовый масштаб вихря (~1.1м высота)
 
   window.TORNADO_POSTER_POS   = TORNADO_POSTER_POS;
   window.TORNADO_ROOM_DEFAULT = TORNADO_ROOM_DEFAULT;
@@ -555,7 +555,7 @@
     tornadoGroup.add(groundSwirlMesh);
 
     // Абразивный диск контакта с полом/столом
-    const floorContactGeo = new THREE.PlaneGeometry(0.38, 0.38);
+    const floorContactGeo = new THREE.PlaneGeometry(0.85, 0.85);
     floorContactGeo.rotateX(-Math.PI / 2);
     const floorContactMat = new THREE.MeshBasicMaterial({
       map: floorAbrasionTexture,
@@ -778,7 +778,7 @@
     addWindow(0.505, 0.48, -0.06, Math.PI / 2);
 
     cabin.position.y = -0.05;
-    cabin.scale.setScalar(0.085);
+    cabin.scale.setScalar(0.18);
     houseGroup.add(cabin);
     houseGroup.visible = false;
     if (dioramaGroup) dioramaGroup.add(houseGroup);
