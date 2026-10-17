@@ -1,0 +1,467 @@
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+
+/* ── CAMERA ── */
+#camera-video {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 1;
+}
+#mock-bg {
+  position: fixed; inset: 0; z-index: 0;
+  background: radial-gradient(circle at 50% 40%, #12201a 0%, #060e0a 100%);
+}
+#mock-bg .grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,162,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,162,.04) 1px, transparent 1px);
+  background-size: 38px 38px;
+}
+
+/* ── AR STAGE ── */
+#ar-stage {
+  position: fixed; inset: 0; z-index: 10;
+  pointer-events: none; overflow: hidden;
+}
+
+/* ── TOP HUD (скрыт для чистого кино-AR режима) ── */
+#hud-top {
+  display: none !important;
+}
+
+/* ── FLASH OVERLAY ── */
+#flash {
+  position: fixed; inset: 0; background: #00ffa2; opacity: 0;
+  pointer-events: none; z-index: 500;
+  transition: opacity .45s ease-out;
+}
+
+/* ══════════════════════════════════
+   SCENE 1: 3D AR HURRICANE & POSTER
+   ══════════════════════════════════ */
+#scene1 {
+  position: absolute; inset: 0;
+  z-index: 20; pointer-events: auto; touch-action: none;
+  overflow: hidden;
+}
+#three-container {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  z-index: 21; cursor: grab;
+}
+#three-container:active { cursor: grabbing; }
+
+#swipe-trail {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; z-index: 24;
+}
+
+/* ── AR WARNING BANNER (ТОЛЬКО ПРИ ВЗАИМОДЕЙСТВИИ МИМО АФИШИ) ── */
+#ar-aim-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── AR TARGET PROMPT (НАВЕДИТЕСЬ НА АФИШУ) ── */
+#ar-target-prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 55;
+}
+.ar-target-frame {
+  position: relative;
+  width: clamp(250px, 72vw, 320px);
+  height: clamp(330px, 55vh, 430px);
+  border: 2px dashed rgba(0, 255, 162, 0.45);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 18px;
+  text-align: center;
+  background: radial-gradient(circle, rgba(0, 255, 162, 0.08) 0%, rgba(0, 0, 0, 0.55) 85%);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 0 40px rgba(0, 255, 162, 0.15), inset 0 0 30px rgba(0, 255, 162, 0.08);
+  animation: targetPulse 2.4s ease-in-out infinite;
+}
+@keyframes targetPulse {
+  0%, 100% { border-color: rgba(0, 255, 162, 0.4); box-shadow: 0 0 35px rgba(0, 255, 162, 0.15); }
+  50% { border-color: rgba(0, 255, 162, 0.9); box-shadow: 0 0 55px rgba(0, 255, 162, 0.35); }
+}
+.ar-target-corner {
+  position: absolute;
+  width: 26px; height: 26px;
+  border-color: #00ffa2;
+  border-style: solid;
+}
+.ar-target-corner.tl { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 20px; }
+.ar-target-corner.tr { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 20px; }
+.ar-target-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 20px; }
+.ar-target-corner.br { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 20px; }
+
+.ar-target-icon {
+  font-size: 42px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 0 16px rgba(0, 255, 162, 0.8));
+  animation: floatIcon 2s ease-in-out infinite alternate;
+}
+@keyframes floatIcon {
+  0% { transform: translateY(-4px); }
+  100% { transform: translateY(4px); }
+}
+.ar-target-title {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+.ar-target-desc {
+  color: #a7f3d0;
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 240px;
+  margin-bottom: 16px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+.ar-target-btn {
+  background: rgba(0, 255, 162, 0.22);
+  border: 1px solid #00ffa2;
+  color: #e6fffa;
+  padding: 9px 18px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 15px rgba(0, 255, 162, 0.25);
+  transition: all 0.2s ease;
+}
+.ar-target-btn:active {
+  transform: scale(0.96);
+  background: #00ffa2;
+  color: #012415;
+}
+
+/* Моргающая надпись предупреждения */
+#ar-warning-banner {
+  margin-top: 16px;
+  padding: 10px 22px;
+  border-radius: 20px;
+  background: rgba(220, 38, 38, 0.92);
+  border: 2px solid #fecaca;
+  color: #ffffff;
+  font-size: clamp(12.5px, 2.5vw, 15px);
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.85);
+  animation: blinkWarning 0.75s ease-in-out infinite;
+  transition: opacity 0.25s ease;
+  text-align: center;
+}
+@keyframes blinkWarning {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.9);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(0.96);
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
+  }
+}
+
+/* ══════════════════════════════════
+   SCENE 2 & 3: 3D PAN WORLD
+   ══════════════════════════════════ */
+#world {
+  position: absolute; inset: 0; display: none;
+  perspective: 900px; overflow: hidden;
+}
+/* The virtual camera pan — rotated by JS */
+#cam {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* ── FRONT (0°): Emerald City ── */
+#view-front {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  justify-content: flex-end; align-items: center;
+  backface-visibility: hidden;
+  transform: rotateY(0deg) translateZ(0);
+}
+#city-img {
+  width: 100%; max-height: 75vh;
+  object-fit: contain; object-position: bottom;
+  filter: drop-shadow(0 0 40px rgba(0,255,140,.45));
+  transform: translateY(80px) scale(.9); opacity: 0;
+  transition: transform 1.4s cubic-bezier(.16,1,.3,1), opacity .9s ease;
+  will-change: transform, opacity;
+}
+#city-img.visible { transform: translateY(0) scale(1); opacity: 1; }
+
+/* ── BACK (180°): Yellow brick road + walking heroes ── */
+#view-back {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  justify-content: flex-end; align-items: center;
+  backface-visibility: hidden;
+  /* Rotated 180° around Y so it's behind us */
+  transform: rotateY(180deg) translateZ(0);
+}
+#road-img {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  width: 100%; height: clamp(280px, 48vh, 520px);
+  object-fit: fill; object-position: bottom;
+  filter: drop-shadow(0 0 24px rgba(255,213,61,.35));
+  pointer-events: none;
+}
+
+/* Heroes group — walks along Yellow Brick Road from horizon down to camera */
+#heroes {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: clamp(4px, 1.8vw, 14px);
+  transform-origin: bottom center;
+  /* Initial far position at the horizon */
+  transform: translateX(-50%) translateY(-280px) scale(0.065);
+  opacity: 0;
+  will-change: transform, opacity, filter;
+  transition: none; /* animated via JS rAF */
+  pointer-events: none;
+}
+
+.hero {
+  object-fit: contain;
+  transform-origin: bottom center;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.65));
+  will-change: transform;
+}
+.hero-ellie     { height: 135px; }
+.hero-toto      { height:  56px; }
+.hero-scarecrow { height: 138px; }
+.hero-woodman   { height: 136px; }
+.hero-lion      { height: 135px; }
+
+/* ── DEDICATED WALKING GAITS FOR EACH CHARACTER ── */
+/* Ellie: energetic, cheerful girl's stride with foot bounce */
+.hero-ellie.walking {
+  animation: walkEllie 0.62s ease-in-out infinite;
+}
+@keyframes walkEllie {
+  0%   { transform: rotate(-4.5deg) translateY(0px); }
+  25%  { transform: rotate(-1deg)   translateY(-10px); }
+  50%  { transform: rotate(4.5deg)  translateY(0px); }
+  75%  { transform: rotate(1deg)    translateY(-10px); }
+  100% { transform: rotate(-4.5deg) translateY(0px); }
+}
+
+/* Toto: fast, joyful puppy trot with bouncy tail */
+.hero-toto.walking {
+  animation: walkToto 0.34s ease-in-out infinite;
+}
+@keyframes walkToto {
+  0%   { transform: rotate(-7deg) translateY(0px) scaleX(1); }
+  25%  { transform: rotate(-2deg) translateY(-12px) scaleX(1.08); }
+  50%  { transform: rotate(7deg)  translateY(0px) scaleX(1); }
+  75%  { transform: rotate(2deg)  translateY(-12px) scaleX(0.94); }
+  100% { transform: rotate(-7deg) translateY(0px) scaleX(1); }
+}
+
+/* Scarecrow: loose, floppy straw-man wobble */
+.hero-scarecrow.walking {
+  animation: walkScarecrow 0.74s ease-in-out infinite;
+}
+@keyframes walkScarecrow {
+  0%   { transform: rotate(-8deg) translateY(0px) skewX(-4deg); }
+  25%  { transform: rotate(-2deg) translateY(-14px) skewX(3deg); }
+  50%  { transform: rotate(8deg)  translateY(0px) skewX(4deg); }
+  75%  { transform: rotate(2deg)  translateY(-14px) skewX(-3deg); }
+  100% { transform: rotate(-8deg) translateY(0px) skewX(-4deg); }
+}
+
+/* Tin Woodman: stiff, robotic, clanking cadence */
+.hero-woodman.walking {
+  animation: walkWoodman 0.68s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes walkWoodman {
+  0%   { transform: rotate(-3.5deg) translateY(0px); }
+  25%  { transform: rotate(-1deg)   translateY(-7px); }
+  50%  { transform: rotate(3.5deg)  translateY(0px); }
+  75%  { transform: rotate(1deg)    translateY(-7px); }
+  100% { transform: rotate(-3.5deg) translateY(0px); }
+}
+
+/* Cowardly Lion: heavy swaggering prowl */
+.hero-lion.walking {
+  animation: walkLion 0.82s ease-in-out infinite;
+}
+@keyframes walkLion {
+  0%   { transform: rotate(-4.5deg) translateY(0px) scaleY(0.95); }
+  25%  { transform: rotate(-1deg)   translateY(-11px) scaleY(1.03); }
+  50%  { transform: rotate(4.5deg)  translateY(0px) scaleY(0.95); }
+  75%  { transform: rotate(1deg)    translateY(-11px) scaleY(1.03); }
+  100% { transform: rotate(-4.5deg) translateY(0px) scaleY(0.95); }
+}
+
+/* Idle subtle breathing when stopped */
+.hero:not(.walking) {
+  animation: idleBreathe 2s ease-in-out infinite alternate;
+}
+@keyframes idleBreathe {
+  from { transform: translateY(0) scale(1); }
+  to   { transform: translateY(-3px) scale(1.01); }
+}
+
+/* Speech bubble on heroes */
+#bubble {
+  position: absolute; top: -40px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,28,18,.88); border: 1px solid #00ffa2;
+  color: #a7ffeb; padding: 5px 13px; border-radius: 12px;
+  font-size: 11px; white-space: nowrap;
+  box-shadow: 0 3px 12px rgba(0,255,162,.3);
+  pointer-events: none; opacity: 0;
+  transition: opacity .6s ease;
+}
+#bubble::after {
+  content: ''; position: absolute; bottom: -6px; left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(0,28,18,.88);
+}
+
+/* Scene 3: heroes on city side */
+#scene3-heroes {
+  position: absolute; bottom: 8px; left: 50%;
+  transform: translateX(-50%);
+  display: none; flex-direction: row;
+  align-items: flex-end; justify-content: center;
+  gap: clamp(4px,1.8vw,14px);
+  transform-origin: bottom center;
+  will-change: transform, opacity;
+  transition: transform 4.2s cubic-bezier(.2,.8,.4,1), opacity 3.5s ease;
+}
+#scene3-heroes.walk-in {
+  transform: translateX(-50%) scale(.3) translateY(-90px);
+  opacity: .25;
+}
+
+.hero-s3 {
+  object-fit: contain;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.6));
+}
+.hero-s3.hero-ellie     { height: 120px; }
+.hero-s3.hero-toto      { height:  52px; }
+.hero-s3.hero-scarecrow { height: 120px; }
+.hero-s3.hero-woodman   { height: 120px; }
+.hero-s3.hero-lion      { height: 120px; }
+
+/* AR badge bottom right */
+#ar-badge {
+  position: fixed; bottom: 10px; right: 14px;
+  background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.15);
+  border-radius: 10px; padding: 3px 9px;
+  font-size: 10px; color: rgba(255,255,255,.5);
+  z-index: 100; pointer-events: none;
+}
+
+#mock-bg.hidden {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ── AR MODALS (CAMERA GATE & HTTPS NOTICES) ── */
+.ar-modal {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(3, 12, 8, 0.88);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px; pointer-events: auto;
+  animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.ar-modal-card {
+  background: radial-gradient(circle at 50% 15%, rgba(0, 48, 30, 0.98), rgba(2, 18, 12, 0.98));
+  border: 1.5px solid #00ffa2;
+  box-shadow: 0 0 32px rgba(0, 255, 162, 0.35), inset 0 0 20px rgba(0, 255, 162, 0.08);
+  border-radius: 26px;
+  padding: 26px 22px;
+  max-width: 370px; width: 100%;
+  text-align: center; color: #fff;
+}
+.ar-modal-icon {
+  font-size: 42px; margin-bottom: 10px;
+  filter: drop-shadow(0 0 16px rgba(0, 255, 162, 0.6));
+}
+.ar-modal-title {
+  font-size: 19px; font-weight: 700; color: #00ffa2;
+  margin-bottom: 8px; line-height: 1.3;
+  text-shadow: 0 0 10px rgba(0, 255, 162, 0.35);
+}
+.ar-modal-desc {
+  font-size: 13px; line-height: 1.5; color: #c5ecd8;
+  margin-bottom: 18px;
+}
+.ar-modal-desc code {
+  background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 4px;
+  color: #ffd53d; font-family: monospace;
+}
+.ar-btn-primary {
+  width: 100%; padding: 13px 18px;
+  background: linear-gradient(135deg, #00ffa2, #00b374);
+  border: none; border-radius: 20px;
+  color: #022013; font-weight: 700; font-size: 15px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 4px 18px rgba(0, 255, 162, 0.45);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.ar-btn-primary:active { transform: scale(0.97); }
+.ar-btn-secondary {
+  width: 100%; padding: 10px 16px; margin-top: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 18px; color: #a0d8be; font-size: 12.5px;
+  cursor: pointer; transition: background 0.15s;
+}
+.ar-btn-secondary:active { background: rgba(255, 255, 255, 0.16); }
+.ar-help-box {
+  margin-top: 14px; padding: 11px 13px;
+  background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(0, 255, 162, 0.22);
+  border-radius: 13px; text-align: left; font-size: 11.5px; color: #9fd7be; line-height: 1.45;
+}
+.ar-help-box b { color: #ffd53d; }
+.ar-status-error {
+  margin-top: 12px; padding: 10px 12px;
+  background: rgba(255, 50, 70, 0.18); border: 1px solid rgba(255, 77, 109, 0.5);
+  border-radius: 12px; color: #ffb8c6; font-size: 12px; line-height: 1.4;
+  display: none; text-align: left;
+}
