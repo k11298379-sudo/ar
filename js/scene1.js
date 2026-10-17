@@ -548,7 +548,7 @@
 
       if (tornadoGroup) {
         tornadoGroup.position.lerpVectors(window.TORNADO_POSTER_POS, window.TORNADO_ROOM_DEFAULT, ease);
-        tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.28;
+        tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.16;
         const currentScale = THREE.MathUtils.lerp(0.02, window.TORNADO_BASE_SCALE, ease);
         tornadoGroup.scale.setScalar(currentScale);
         tornadoGroup.rotation.y += dt * 14.0;
@@ -586,8 +586,8 @@
       tornadoGroup.position.z += tornadoVel.z * dt;
       tornadoVel.multiplyScalar(0.92);
 
-      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.45, 0.45);
-      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, 0.15, 0.65);
+      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.32, 0.32);
+      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, 0.02, 0.20);
       tornadoGroup.position.y = window.TORNADO_ROOM_DEFAULT.y;
 
       const isAimed = window.checkAimAtPoster ? window.checkAimAtPoster() : true;
@@ -650,7 +650,7 @@
     // Частицы вихря
     if (vortexParticles && !tornadoBlowAway && window.vortexParticleData) {
       const posArr = vortexParticles.geometry.attributes.position.array;
-      const maxHeight = 5.2;
+      const maxHeight = 2.4;
       for (let i = 0; i < window.vortexParticleData.length; i++) {
         const pd = window.vortexParticleData[i];
         pd.angle += pd.angularSpeed * tornadoSpeedMult * dt;
@@ -658,9 +658,9 @@
         if (pd.isBaseDust && pd.h > 0.20) pd.h = 0.01;
         else if (pd.h > 1.0) pd.h = 0.02;
 
-        const rad = pd.isBaseDust ? pd.radiusSpread : (0.22 + Math.pow(pd.h, 1.55) * 2.05) * 0.85;
+        const rad = pd.isBaseDust ? pd.radiusSpread : (0.12 + Math.pow(pd.h, 1.4) * 0.72) * 0.85;
         posArr[i * 3]     = Math.cos(pd.angle) * rad;
-        posArr[i * 3 + 1] = 0.12 + pd.h * maxHeight;
+        posArr[i * 3 + 1] = 0.02 + pd.h * maxHeight;
         posArr[i * 3 + 2] = Math.sin(pd.angle) * rad;
       }
       vortexParticles.geometry.attributes.position.needsUpdate = true;
@@ -670,8 +670,8 @@
     windRibbons.forEach(r => { r.rotation.y += r.userData.speed * tornadoSpeedMult * dt; });
     debrisList.forEach(d => {
       d.userData.angle += d.userData.speed * tornadoSpeedMult * dt;
-      const r = 0.38 + Math.pow(d.userData.t, 1.4) * 1.95 + d.userData.radiusOffset;
-      d.position.set(Math.cos(d.userData.angle) * r, 0.25 + d.userData.t * 4.7, Math.sin(d.userData.angle) * r);
+      const r = 0.14 + Math.pow(d.userData.t, 1.35) * 0.72 + d.userData.radiusOffset * 0.15;
+      d.position.set(Math.cos(d.userData.angle) * r, 0.06 + d.userData.t * 2.2, Math.sin(d.userData.angle) * r);
       d.rotation.x += d.userData.rotSpeed.x * dt;
       d.rotation.y += d.userData.rotSpeed.y * dt;
     });
@@ -679,12 +679,12 @@
     // 2. Анимация Домика Элли
     if (houseState === 'ORBITING' && houseGroup && tornadoGroup) {
       const hAngle = elapsed * 2.2 * tornadoSpeedMult;
-      const orbitR = 0.24;
-      const bobY = Math.sin(elapsed * 4.2) * 0.03;
+      const orbitR = 0.14;
+      const bobY = Math.sin(elapsed * 4.2) * 0.015;
 
       houseGroup.position.set(
         tornadoGroup.position.x + Math.cos(hAngle) * orbitR,
-        tornadoGroup.position.y + 0.38 + bobY,
+        tornadoGroup.position.y + 0.26 + bobY,
         tornadoGroup.position.z + Math.sin(hAngle) * orbitR
       );
 

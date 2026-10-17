@@ -6,8 +6,8 @@
   'use strict';
 
   // Константы позиционирования для MR
-  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 0.18, -0.35); // глубина внутри афиши
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.78, 0.38); // место приземления перед афишей (стол/пол)
+  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 0.08, -0.22); // глубина внутри афиши
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.62, 0.10); // место приземления перед афишей (стол/пол)
   const TORNADO_BASE_SCALE   = 0.16; // базовый масштаб вихря
 
   window.TORNADO_POSTER_POS   = TORNADO_POSTER_POS;
@@ -491,20 +491,21 @@
     if (dioramaGroup) dioramaGroup.add(tornadoGroup);
 
     tornadoRings = [];
-    const numSlices = 28;
-    const maxHeight = 5.2;
+    const numSlices = 24;
+    const maxHeight = 2.4; // Компактная высота вихря (~38 см в MR)
 
     for (let i = 0; i < numSlices; i++) {
       const t = i / (numSlices - 1);
-      const radius = 0.22 + Math.pow(t, 1.55) * 1.85 + (t > 0.82 ? Math.pow(t - 0.82, 1.2) * 1.8 : 0);
-      const heightStep = (maxHeight / numSlices) * 1.55;
+      // Компактный радиус воронки: от 0.14 у основания до 0.86 на вершине
+      const radius = 0.14 + Math.pow(t, 1.4) * 0.72;
+      const heightStep = (maxHeight / numSlices) * 1.35;
 
-      const sliceGeo = new THREE.CylinderGeometry(radius * 1.08, radius * 0.92, heightStep, 20, 1, true);
+      const sliceGeo = new THREE.CylinderGeometry(radius * 1.06, radius * 0.94, heightStep, 20, 1, true);
       const posAttr = sliceGeo.attributes.position;
       for (let v = 0; v < posAttr.count; v++) {
         const vx = posAttr.getX(v), vz = posAttr.getZ(v);
         const angle = Math.atan2(vz, vx);
-        const n = Math.sin(angle * 3 + i * 0.9) * 0.08 + Math.cos(angle * 5 - i) * 0.05;
+        const n = Math.sin(angle * 3 + i * 0.9) * 0.06 + Math.cos(angle * 5 - i) * 0.04;
         posAttr.setX(v, vx * (1 + n));
         posAttr.setZ(v, vz * (1 + n));
       }
@@ -512,21 +513,22 @@
 
       const hue = 0.56 - (1 - t) * 0.46;
       const sat = 0.22 + (1 - t) * 0.15;
-      const light = 0.26 + t * 0.22;
+      const light = 0.28 + t * 0.22;
       const sliceColor = new THREE.Color().setHSL(hue, sat, light);
 
+      // Полупрозрачный эфирный материал (не перекрывает экран наглухо)
       const sliceMat = new THREE.MeshStandardMaterial({
         color: sliceColor,
         roughness: 0.88,
         metalness: 0.05,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: (0.65 - t * 0.18),
+        opacity: (0.28 - t * 0.08),
         depthWrite: false
       });
 
       const sliceMesh = new THREE.Mesh(sliceGeo, sliceMat);
-      sliceMesh.position.y = 0.04 + t * maxHeight;
+      sliceMesh.position.y = 0.02 + t * maxHeight;
       sliceMesh.rotation.y = i * 0.55;
       sliceMesh.userData = {
         t: t,
@@ -539,26 +541,26 @@
     }
 
     // Приземный пылевой буран
-    const groundSwirlGeo = new THREE.CylinderGeometry(1.65, 0.45, 0.65, 24, 2, true);
+    const groundSwirlGeo = new THREE.CylinderGeometry(0.55, 0.18, 0.24, 24, 2, true);
     const groundSwirlMat = new THREE.MeshStandardMaterial({
       color: 0x786452,
       roughness: 0.95,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.32,
       side: THREE.DoubleSide,
       depthWrite: false
     });
     groundSwirlMesh = new THREE.Mesh(groundSwirlGeo, groundSwirlMat);
-    groundSwirlMesh.position.y = 0.32;
+    groundSwirlMesh.position.y = 0.12;
     tornadoGroup.add(groundSwirlMesh);
 
     // Абразивный диск контакта с полом/столом
-    const floorContactGeo = new THREE.PlaneGeometry(0.85, 0.85);
+    const floorContactGeo = new THREE.PlaneGeometry(0.38, 0.38);
     floorContactGeo.rotateX(-Math.PI / 2);
     const floorContactMat = new THREE.MeshBasicMaterial({
       map: floorAbrasionTexture,
       transparent: true,
-      opacity: 0.88,
+      opacity: 0.75,
       depthWrite: false
     });
     floorContactMesh = new THREE.Mesh(floorContactGeo, floorContactMat);
@@ -566,8 +568,8 @@
     floorContactMesh.visible = false;
     if (dioramaGroup) dioramaGroup.add(floorContactMesh);
 
-    // 1200 объёмных частиц вихря
-    const pCount = 1200;
+    // 650 аккуратных частиц вихря (размер 0.045 вместо 0.44!)
+    const pCount = 650;
     const pGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(pCount * 3);
     const colors = new Float32Array(pCount * 3);
@@ -577,11 +579,11 @@
     for (let i = 0; i < pCount; i++) {
       const t = Math.random();
       const angle = Math.random() * Math.PI * 2;
-      const isBaseDust = i < 280;
+      const isBaseDust = i < 180;
       const h = isBaseDust ? Math.random() * 0.12 : t;
       const radiusSpread = isBaseDust
-        ? (0.40 + Math.random() * 1.55)
-        : (0.24 + Math.pow(h, 1.55) * 2.05) * (0.82 + Math.random() * 0.45);
+        ? (0.16 + Math.random() * 0.35)
+        : (0.12 + Math.pow(h, 1.4) * 0.72) * (0.85 + Math.random() * 0.3);
 
       vortexParticleData.push({
         h: h,
@@ -608,11 +610,11 @@
     pGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const pMat = new THREE.PointsMaterial({
-      size: 0.44,
+      size: 0.045,
       map: cloudAlphaTexture,
       vertexColors: true,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.38,
       depthWrite: false,
       blending: THREE.NormalBlending
     });
@@ -622,33 +624,33 @@
 
     // Ветровые ленты
     windRibbons = [];
-    for (let r = 0; r < 12; r++) {
-      const t = (r + 0.5) / 12;
-      const radius = 0.45 + Math.pow(t, 1.45) * 2.25;
-      const arcGeo = new THREE.TorusGeometry(radius, 0.018, 5, 28, Math.PI * (0.65 + Math.random() * 0.55));
+    for (let r = 0; r < 10; r++) {
+      const t = (r + 0.5) / 10;
+      const radius = 0.18 + Math.pow(t, 1.35) * 0.75;
+      const arcGeo = new THREE.TorusGeometry(radius, 0.008, 4, 24, Math.PI * (0.65 + Math.random() * 0.55));
       arcGeo.rotateX(Math.PI / 2);
-      const arcMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.32, depthWrite: false });
+      const arcMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.22, depthWrite: false });
       const ribbon = new THREE.Mesh(arcGeo, arcMat);
       ribbon.userData = { t: t, speed: 5.5 + Math.random() * 3.5 };
       tornadoGroup.add(ribbon);
       windRibbons.push(ribbon);
     }
 
-    // Летающие обломки
+    // Летающие обломки (компактные досочки и камешки)
     debrisList = [];
-    const plankGeo = new THREE.BoxGeometry(0.26, 0.03, 0.07);
-    const rockGeo  = new THREE.DodecahedronGeometry(0.065, 0);
+    const plankGeo = new THREE.BoxGeometry(0.07, 0.012, 0.022);
+    const rockGeo  = new THREE.DodecahedronGeometry(0.018, 0);
     const plankMat = new THREE.MeshStandardMaterial({ map: woodPlankTexture, roughness: 0.8 });
     const leafMat  = new THREE.MeshStandardMaterial({ color: 0x365314, roughness: 0.7 });
 
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 22; i++) {
       const isPlank = i % 2 === 0;
       const mesh = new THREE.Mesh(isPlank ? plankGeo : rockGeo, isPlank ? plankMat : leafMat);
       mesh.userData = {
         t: Math.random(),
         angle: Math.random() * Math.PI * 2,
         speed: 3.4 + Math.random() * 4.0,
-        radiusOffset: 0.25 + Math.random() * 0.65,
+        radiusOffset: 0.08 + Math.random() * 0.25,
         rotSpeed: new THREE.Vector3(3 + Math.random() * 5, 4 + Math.random() * 5, 2 + Math.random() * 4)
       };
       tornadoGroup.add(mesh);
@@ -775,8 +777,8 @@
     addWindow(-0.505, 0.48, -0.06, -Math.PI / 2);
     addWindow(0.505, 0.48, -0.06, Math.PI / 2);
 
-    cabin.position.y = -0.15;
-    cabin.scale.setScalar(0.22);
+    cabin.position.y = -0.05;
+    cabin.scale.setScalar(0.085);
     houseGroup.add(cabin);
     houseGroup.visible = false;
     if (dioramaGroup) dioramaGroup.add(houseGroup);
@@ -790,7 +792,7 @@
   function createDustBurstSystem() {
     const dioramaGroup = window.dioramaGroup;
     dustBurstPuffs = [];
-    const geo = new THREE.DodecahedronGeometry(0.15, 1);
+    const geo = new THREE.DodecahedronGeometry(0.05, 1);
     for (let i = 0; i < 20; i++) {
       const mat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.9, transparent: true, opacity: 0 });
       const puff = new THREE.Mesh(geo, mat);
@@ -806,11 +808,11 @@
     dustBurstPuffs.forEach((p, idx) => {
       const angle = (idx / dustBurstPuffs.length) * Math.PI * 2 + Math.random() * 0.3;
       const spd = 1.4 + Math.random() * 1.8;
-      p.position.copy(pos).add(new THREE.Vector3(0, -0.1, 0));
-      p.userData.vel.set(Math.cos(angle) * spd, 0.9 + Math.random() * 1.4, Math.sin(angle) * spd);
+      p.position.copy(pos).add(new THREE.Vector3(0, -0.04, 0));
+      p.userData.vel.set(Math.cos(angle) * spd * 0.6, 0.4 + Math.random() * 0.6, Math.sin(angle) * spd * 0.6);
       p.userData.life = 0.001;
       p.userData.maxLife = 0.65 + Math.random() * 0.3;
-      p.scale.setScalar(0.7 + Math.random() * 0.7);
+      p.scale.setScalar(0.25 + Math.random() * 0.25);
       p.material.opacity = 0.88;
       p.visible = true;
     });
@@ -874,13 +876,13 @@
       const spread = (Math.random() - 0.5) * 0.7;
       p.position.copy(impactPos).add(new THREE.Vector3(nx * 0.1, 0.1 + spread * 0.25, nz * 0.1));
       p.userData.vel.set(
-        (nx * 1.8) + (Math.random() - 0.5) * 0.9,
-        0.5 + Math.random() * 0.8,
-        (nz * 1.8) + (Math.random() - 0.5) * 0.9
+        (nx * 0.9) + (Math.random() - 0.5) * 0.45,
+        0.3 + Math.random() * 0.4,
+        (nz * 0.9) + (Math.random() - 0.5) * 0.45
       );
       p.userData.life = 0.001;
       p.userData.maxLife = 0.5 + Math.random() * 0.25;
-      p.scale.setScalar(0.48 + Math.random() * 0.45);
+      p.scale.setScalar(0.18 + Math.random() * 0.15);
       p.material.opacity = 0.85;
       p.visible = true;
     }
