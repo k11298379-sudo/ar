@@ -6,7 +6,7 @@
   <title>Волшебник Изумрудного Города — AR</title>
   
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=20261017_1425" />
 
   <!-- Core Libraries -->
   <script src="assets/three.min.js"></script>
@@ -115,16 +115,18 @@
 
       <!-- МОРГАЮЩЕЕ ПРЕДУПРЕЖДЕНИЕ И РАМКА ПРИЦЕЛА НА АФИШУ -->
       <div id="ar-aim-container">
-        <!-- Рамка прицеливания на афишу (скрывается, когда афиша найдена и ураган вылетел) -->
+        <!-- Рамка прицеливания на афишу (прозрачный видоискатель + лазерный луч) -->
         <div id="ar-target-prompt">
           <div class="ar-target-frame">
             <span class="ar-target-corner tl"></span>
             <span class="ar-target-corner tr"></span>
             <span class="ar-target-corner bl"></span>
             <span class="ar-target-corner br"></span>
-            <div class="ar-target-icon">🖼️</div>
-            <div class="ar-target-title">Наведите камеру на афишу</div>
-            <div class="ar-target-desc">Держите афишу фильма в рамке, чтобы оживить сказочный мир</div>
+            <div class="ar-scan-laser"></div>
+          </div>
+          <div class="ar-target-bottom-card">
+            <div class="ar-target-title">🖼️ Наведите на афишу целиком</div>
+            <div class="ar-target-desc">Отодвиньте телефон так, чтобы плакат целиком поместился в кадр</div>
           </div>
         </div>
 
@@ -178,16 +180,16 @@
     </main>
 
     <div id="flash"></div>
-    <div id="ar-badge">AR • Изумрудный Город</div>
+    <div id="ar-badge">🔍 Сканирование афиши...</div>
   </div>
 
-  <!-- Modular Scripts -->
-  <script src="js/state.js"></script>
-  <script src="js/audio.js"></script>
-  <script src="js/models.js"></script>
-  <script src="js/tracking.js"></script>
-  <script src="js/scene1.js"></script>
-  <script src="js/scene23.js"></script>
-  <script src="js/main.js"></script>
+  <!-- Modular Scripts with Cache-Busting -->
+  <script src="js/state.js?v=20261017_1425"></script>
+  <script src="js/audio.js?v=20261017_1425"></script>
+  <script src="js/models.js?v=20261017_1425"></script>
+  <script src="js/tracking.js?v=20261017_1425"></script>
+  <script src="js/scene1.js?v=20261017_1425"></script>
+  <script src="js/scene23.js?v=20261017_1425"></script>
+  <script src="js/main.js?v=20261017_1425"></script>
 </body>
 </html>

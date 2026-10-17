@@ -123,6 +123,12 @@
               const banner = document.getElementById('ar-warning-banner');
               if (banner) banner.style.display = 'none';
 
+              const badge = document.getElementById('ar-badge');
+              if (badge) {
+                badge.textContent = '🎯 Афиша распознана!';
+                badge.classList.add('detected');
+              }
+
               if (window.tornadoState === 'WAITING_FOR_POSTER') {
                 triggerPosterEncounter();
               }
@@ -134,6 +140,12 @@
 
                 if (dioramaGroup) dioramaGroup.visible = false;
                 if (posterGroup) posterGroup.visible = false;
+
+                const badge = document.getElementById('ar-badge');
+                if (badge) {
+                  badge.textContent = '🔍 Наведите на афишу целиком';
+                  badge.classList.remove('detected');
+                }
 
                 // Напоминаем навести камеру на афишу
                 if (window.tornadoState !== 'WAITING_FOR_POSTER') {
@@ -147,6 +159,9 @@
       });
 
       console.log('[OpticalAR] Loading targets.mind...');
+      const badge = document.getElementById('ar-badge');
+      if (badge) badge.textContent = '⚙️ Загрузка AR-модели...';
+
       const targetRes = await mindarController.addImageTargets('targets.mind?v=' + Date.now());
       console.log('[OpticalAR] Target compiled data loaded! Result:', targetRes);
 
@@ -171,6 +186,7 @@
       updateCameraProjection();
       console.log('[OpticalAR] Camera projection synchronized! Beginning continuous video tracking...');
       mindarController.processVideo(videoEl);
+      if (badge) badge.textContent = '🔍 Наведите на афишу целиком';
       opticalTrackingInitialized = true;
       window.opticalTrackingInitialized = true;
       window.mindarController = mindarController;
