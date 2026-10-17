@@ -106,6 +106,107 @@
       50%      { transform: translateY(-4px); }
     }
 
+    /* ── AR AIMING RETICLE & BLINKING WARNING ── */
+    #ar-aim-container {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 28;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .ar-reticle {
+      width: clamp(140px, 32vw, 210px);
+      height: clamp(140px, 32vw, 210px);
+      border: 2px dashed rgba(0, 255, 162, 0.4);
+      border-radius: 20px;
+      position: relative;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 16px rgba(0, 255, 162, 0.15);
+    }
+    .ar-reticle.aimed {
+      border-color: #00ffa2;
+      border-style: solid;
+      border-width: 2.5px;
+      box-shadow: 0 0 35px rgba(0, 255, 162, 0.65), inset 0 0 16px rgba(0, 255, 162, 0.2);
+      transform: scale(1.04);
+    }
+    .ar-reticle::before, .ar-reticle::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-color: #ffd53d;
+      border-style: solid;
+    }
+    .ar-reticle::before {
+      top: -3px; left: -3px;
+      border-width: 3px 0 0 3px;
+      border-top-left-radius: 6px;
+    }
+    .ar-reticle::after {
+      bottom: -3px; right: -3px;
+      border-width: 0 3px 3px 0;
+      border-bottom-right-radius: 6px;
+    }
+    .ar-reticle-status {
+      position: absolute;
+      top: -34px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 12px;
+      background: rgba(4, 25, 16, 0.85);
+      color: #6ee7b7;
+      border: 1px solid rgba(0, 255, 162, 0.5);
+      backdrop-filter: blur(6px);
+      transition: all 0.3s ease;
+    }
+    .ar-reticle.aimed .ar-reticle-status {
+      background: rgba(0, 180, 110, 0.95);
+      color: #022013;
+      border-color: #ffffff;
+      box-shadow: 0 0 20px rgba(0, 255, 162, 0.8);
+    }
+
+    /* Моргающая надпись предупреждения */
+    #ar-warning-banner {
+      margin-top: 16px;
+      padding: 10px 22px;
+      border-radius: 20px;
+      background: rgba(220, 38, 38, 0.92);
+      border: 2px solid #fecaca;
+      color: #ffffff;
+      font-size: clamp(12.5px, 2.5vw, 15px);
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 30px rgba(239, 68, 68, 0.85);
+      animation: blinkWarning 0.75s ease-in-out infinite;
+      transition: opacity 0.25s ease;
+      text-align: center;
+    }
+    @keyframes blinkWarning {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 30px rgba(239, 68, 68, 0.9);
+      }
+      50% {
+        opacity: 0.25;
+        transform: scale(0.96);
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
+      }
+    }
+
     /* ══════════════════════════════════
        SCENE 2 & 3: 3D PAN WORLD
        ══════════════════════════════════ */
@@ -475,15 +576,24 @@
       <div id="three-container"></div>
       <canvas id="swipe-trail"></canvas>
 
+      <!-- ПРИЦЕЛ AR И МОРГАЮЩЕЕ ПРЕДУПРЕЖДЕНИЕ -->
+      <div id="ar-aim-container">
+        <div id="ar-reticle" class="ar-reticle">
+          <div id="ar-reticle-status" class="ar-reticle-status">🎯 АФИША В ПРИЦЕЛЕ</div>
+        </div>
+        <div id="ar-warning-banner" style="display:none;">
+          ⚠️ НАВЕДИТЕСЬ КАМЕРОЙ НА АФИШУ!
+        </div>
+      </div>
+
       <div id="swipe-hud">
         <div id="swipe-gems">
           <div class="swipe-gem" id="gem-1">🌪️</div>
           <div class="swipe-gem" id="gem-2">🌪️</div>
-          <div class="swipe-gem" id="gem-3">🌪️</div>
         </div>
         <div id="swipe-hint">
-          <span>👈👉</span>
-          <span id="swipe-hint-text">Смахни ураган 3 раза, чтобы развеять бурю</span>
+          <span id="swipe-hint-icon">👆</span>
+          <span id="swipe-hint-text">Наведите камеру на афишу и смахните 2 раза!</span>
         </div>
       </div>
     </section>
@@ -555,11 +665,13 @@
   const scene1       = $('scene1');
   const threeCont    = $('three-container');
   const swipeTrailEl = $('swipe-trail');
-  const gem1         = $('gem-1');
-  const gem2         = $('gem-2');
-  const gem3         = $('gem-3');
-  const swipeHint    = $('swipe-hint');
-  const swipeHintText= $('swipe-hint-text');
+  const gem1           = $('gem-1');
+  const gem2           = $('gem-2');
+  const swipeHint      = $('swipe-hint');
+  const swipeHintText  = $('swipe-hint-text');
+  const arReticle      = $('ar-reticle');
+  const arReticleStatus= $('ar-reticle-status');
+  const arWarningBanner= $('ar-warning-banner');
 
   // Scene 2/3
   const world      = $('world');
@@ -948,7 +1060,7 @@
   // ═══════════════════════════════════════════════════════
   let tScene, tCamera, tRenderer, tClock;
   let tAnimId = null;
-  let dioramaGroup;
+  let dioramaGroup, posterGroup;
   let posterMesh, clearingGroup;
   let witchCottageGroup, witchLegsGroup, starSparklesPoints;
   let tornadoGroup, tornadoRings = [], vortexParticles, vortexParticleData = [];
@@ -960,7 +1072,7 @@
   // Textures
   let woodPlankTexture, roofShingleTexture, stoneWallTexture, cloudAlphaTexture, posterTexture, witchRoofTexture, stripesTexture;
 
-  // Swipe & House States
+  // Real AR State & Positions
   let swipeCount = 0;
   let houseState = 'ORBITING'; // 'ORBITING' | 'LAUNCHING' | 'LANDED'
   let tornadoTiltCurrent = { x: 0, z: 0 };
@@ -970,15 +1082,25 @@
   let tornadoBlowVel     = new THREE.Vector3();
   let tornadoOpacity     = 1.0;
 
-  const TORNADO_ORIGIN = new THREE.Vector3(-0.6, 0, 0);
-  const WITCH_LANDING  = new THREE.Vector3(2.0, 0.38, 0.35);
+  // Ураган вылетает из афиши в комнату
+  let tornadoState = 'ERUPTING'; // 'ERUPTING' | 'ROAMING'
+  let eruptionStartTime = 0;
+  const ERUPTION_DURATION = 1800;
+  const TORNADO_POSTER_POS   = new THREE.Vector3(0, 1.40, -2.75);
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, 0.0, 0.35);
+  let tornadoVel = new THREE.Vector3(0, 0, 0);
+  let isAimedAtPoster = false;
+
+  // Гироскоп и ориентация камеры смартфона
+  let gyroActive = false, gyroZeroBeta = null, gyroZeroGamma = null;
+  let camGyroPitch = 0, camGyroYaw = 0;
 
   const houseFlight = {
     startTime: 0,
-    duration: 1350,
+    duration: 1400,
     startPos: new THREE.Vector3(),
     startRot: new THREE.Euler(),
-    targetPos: WITCH_LANDING.clone()
+    targetPos: new THREE.Vector3()
   };
 
   let houseBouncePhase = 0;
@@ -1003,8 +1125,8 @@
     const aspect = w / h;
 
     tCamera = new THREE.PerspectiveCamera(aspect < 1 ? 55 : 46, aspect, 0.1, 100);
-    tCamera.position.set(0.2, 4.0, 8.4);
-    tCamera.lookAt(0.2, 1.25, 0);
+    tCamera.position.set(0, 1.35, 2.4);
+    tCamera.lookAt(0, 1.1, -1.2);
 
     tRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     tRenderer.setSize(w, h);
@@ -1046,11 +1168,17 @@
     createDustBurstSystem();
     createStarSparkles();
 
-    // 5. Swipe canvas & pointer events
+    // 5. Swipe canvas, pointer events & gyroscope
     setupSwipeTrailCanvas();
     setupSwipeEvents();
+    initGyroscope();
 
     window.addEventListener('resize', onThreeResize);
+
+    // Eruption start
+    tornadoState = 'ERUPTING';
+    eruptionStartTime = performance.now();
+    swipeCount = 0;
 
     // 6. Start animation loop
     tAnimId = requestAnimationFrame(threeRenderLoop);
@@ -1233,83 +1361,96 @@
 
   // ─── POSTER BASE & ENCHANTED CLEARING ─────────────────
   function createPosterAndClearing() {
-    // 1. Афиша фильма в AR (подиум)
-    const postGeo = new THREE.BoxGeometry(6.4, 0.08, 4.4);
-    const postMatSides = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.35 });
-    const postMatTop = new THREE.MeshStandardMaterial({ map: posterTexture, roughness: 0.65 });
-    const postMats = [postMatSides, postMatSides, postMatTop, postMatSides, postMatSides, postMatSides];
+    // 1. Афиша фильма в AR
+    posterGroup = new THREE.Group();
+    posterGroup.name = "AR_PosterTarget";
+    posterGroup.position.set(0, 1.25, -2.8);
+    posterGroup.rotation.x = -0.06;
+
+    // Рамка и полотно постера
+    const postGeo = new THREE.BoxGeometry(2.4, 3.55, 0.04);
+    const postMatSides = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.3 });
+    const postMatTop   = new THREE.MeshStandardMaterial({ map: posterTexture, roughness: 0.65 });
+    const postMats     = [postMatSides, postMatSides, postMatSides, postMatSides, postMatTop, postMatSides];
     posterMesh = new THREE.Mesh(postGeo, postMats);
-    posterMesh.position.set(0, -0.04, 0);
     posterMesh.receiveShadow = true;
-    dioramaGroup.add(posterMesh);
+    posterGroup.add(posterMesh);
 
-    // 2. Сказочная Поляна (закрывает афишу в AR)
+    // 2. Сказочное поле (перекрывает афишу через AR)
     clearingGroup = new THREE.Group();
-    clearingGroup.name = "EnchantedClearing";
+    clearingGroup.name = "PosterFairytaleMeadow";
+    clearingGroup.position.set(0, 0, 0.03);
 
-    // Зеленый холмик-купол поляны
-    const hillGeo = new THREE.CylinderGeometry(2.65, 3.05, 0.22, 36);
-    const hillMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.8, flatShading: true });
-    const hillMesh = new THREE.Mesh(hillGeo, hillMat);
-    hillMesh.position.y = 0.08;
-    hillMesh.receiveShadow = true;
-    clearingGroup.add(hillMesh);
+    // Зелёное поле ровно по размеру афиши
+    const fieldGeo = new THREE.BoxGeometry(2.36, 3.50, 0.05);
+    const fieldMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.82, flatShading: true });
+    const fieldMesh = new THREE.Mesh(fieldGeo, fieldMat);
+    fieldMesh.receiveShadow = true;
+    clearingGroup.add(fieldMesh);
 
-    // Дорожка из жёлтого кирпича, ведущая через поляну
-    const pathGeo = new THREE.RingGeometry(0.7, 1.45, 18, 1, Math.PI * 0.15, Math.PI * 0.85);
-    pathGeo.rotateX(-Math.PI / 2);
+    // Дорожка из жёлтого кирпича через поле афиши
+    const pathGeo = new THREE.PlaneGeometry(0.55, 2.2);
     const pathMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.75, side: THREE.DoubleSide });
     const pathMesh = new THREE.Mesh(pathGeo, pathMat);
-    pathMesh.position.set(0.6, 0.20, 0.1);
-    pathMesh.rotation.y = 0.3;
+    pathMesh.position.set(0.15, -0.65, 0.035);
+    pathMesh.rotation.z = -0.15;
     clearingGroup.add(pathMesh);
 
-    // Сказочные полевые цветы на поляне
+    // Сказочные полевые цветы на афише
     const flowerColors = [0xef4444, 0xfde047, 0x38bdf8, 0xc084fc, 0xffffff];
-    const flowerGeo = new THREE.DodecahedronGeometry(0.04, 0);
-    for (let f = 0; f < 32; f++) {
+    const flowerGeo = new THREE.DodecahedronGeometry(0.035, 0);
+    for (let f = 0; f < 28; f++) {
       const col = flowerColors[f % flowerColors.length];
       const flMat = new THREE.MeshBasicMaterial({ color: col });
       const flower = new THREE.Mesh(flowerGeo, flMat);
-      const angle = Math.random() * Math.PI * 2;
-      const radius = 0.8 + Math.random() * 1.85;
-      flower.position.set(Math.cos(angle) * radius, 0.20, Math.sin(angle) * radius);
-      flower.scale.y = 0.5;
+      const fx = (Math.random() - 0.5) * 2.0;
+      const fy = (Math.random() - 0.5) * 3.1;
+      flower.position.set(fx, fy, 0.04);
       clearingGroup.add(flower);
     }
 
-    // Сказочные деревца по краям поляны
-    function addTree(x, z, scale = 1.0) {
+    // Декоративные деревца по бокам афиши
+    function addPosterTree(x, y, scale = 1.0) {
       const tg = new THREE.Group();
-      tg.position.set(x, 0.20, z);
+      tg.position.set(x, y, 0.04);
       const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.05 * scale, 0.08 * scale, 0.42 * scale, 6),
+        new THREE.CylinderGeometry(0.04 * scale, 0.06 * scale, 0.3 * scale, 6),
         new THREE.MeshStandardMaterial({ color: 0x5c2d0c, roughness: 0.9 })
       );
-      trunk.position.y = 0.21 * scale;
+      trunk.position.y = 0.15 * scale;
       tg.add(trunk);
       const crown = new THREE.Mesh(
-        new THREE.ConeGeometry(0.35 * scale, 0.82 * scale, 7),
+        new THREE.ConeGeometry(0.25 * scale, 0.65 * scale, 7),
         new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75, flatShading: true })
       );
-      crown.position.y = 0.65 * scale;
+      crown.position.y = 0.5 * scale;
       crown.castShadow = true;
       tg.add(crown);
       clearingGroup.add(tg);
     }
-    addTree(-2.1, -1.2, 1.1);
-    addTree(-2.3, 1.0, 0.85);
-    addTree(0.3, -1.4, 0.95);
-    addTree(2.5, -1.1, 1.05);
+    addPosterTree(-0.95, -0.8, 0.85);
+    addPosterTree(0.95, -0.5, 0.9);
+    addPosterTree(-0.9, 0.9, 0.75);
 
-    dioramaGroup.add(clearingGroup);
+    posterGroup.add(clearingGroup);
+    dioramaGroup.add(posterGroup);
+
+    // 3. Невидимая плоскость теней для реального пола комнаты (без искусственной земли!)
+    const floorShadowGeo = new THREE.PlaneGeometry(35, 35);
+    floorShadowGeo.rotateX(-Math.PI / 2);
+    const floorShadowMat = new THREE.ShadowMaterial({ opacity: 0.38 });
+    const floorShadowMesh = new THREE.Mesh(floorShadowGeo, floorShadowMat);
+    floorShadowMesh.position.y = 0;
+    floorShadowMesh.receiveShadow = true;
+    dioramaGroup.add(floorShadowMesh);
   }
 
   // ─── WICKED WITCH'S CROOKED COTTAGE & SHOES ──────────
   function createWitchCottage() {
     witchCottageGroup = new THREE.Group();
     witchCottageGroup.name = "WickedWitchCottage";
-    witchCottageGroup.position.copy(WITCH_LANDING);
+    // Расположен прямо на афише, перекрывая её
+    witchCottageGroup.position.set(0, 0.40, 0.08);
 
     const witchMatWalls = new THREE.MeshStandardMaterial({ color: 0x3d1a3b, roughness: 0.85 });
     const witchMatRoof  = new THREE.MeshStandardMaterial({ map: witchRoofTexture, roughness: 0.85 });
@@ -1317,41 +1458,40 @@
     const witchGlowMat  = new THREE.MeshStandardMaterial({ color: 0xbef264, emissive: 0x84cc16, emissiveIntensity: 0.9 });
 
     // 1. Каменный цоколь
-    const foundation = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.12, 0.84), witchMatStone);
-    foundation.position.set(0, 0.06, 0);
+    const foundation = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.68, 0.12), witchMatStone);
+    foundation.position.set(0, 0, 0.05);
     witchCottageGroup.add(foundation);
 
-    // 2. Кривые деревянные стены (характерная сказочная кривизна)
-    const walls = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.58, 0.76), witchMatWalls);
-    walls.position.set(0, 0.40, 0);
+    // 2. Кривые деревянные стены
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.58, 0.45), witchMatWalls);
+    walls.position.set(0, 0, 0.28);
     walls.rotation.z = -0.06;
-    walls.rotation.y = 0.08;
     witchCottageGroup.add(walls);
 
     // 3. Заострённая кривая крыша
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.74, 0.85, 4), witchMatRoof);
-    roof.position.set(0.04, 0.98, 0);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.65, 0.75, 4), witchMatRoof);
+    roof.position.set(0.04, 0.48, 0.35);
     roof.rotation.y = Math.PI / 4;
     roof.rotation.z = -0.12;
     witchCottageGroup.add(roof);
 
     // 4. Кривая печная труба с фиолетовым свечением
-    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.44, 0.14), witchMatStone);
-    chimney.position.set(0.25, 0.92, -0.15);
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.38, 0.12), witchMatStone);
+    chimney.position.set(0.24, 0.52, 0.25);
     chimney.rotation.z = 0.15;
     witchCottageGroup.add(chimney);
 
     // 5. Окошко с жутким зеленоватым светом
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.05), witchGlowMat);
-    win.position.set(0, 0.44, 0.39);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.05), witchGlowMat);
+    win.position.set(0, 0, 0.52);
     witchCottageGroup.add(win);
 
-    dioramaGroup.add(witchCottageGroup);
+    clearingGroup.add(witchCottageGroup);
 
     // 6. Полосатые ножки Ведьмы и Серебряные башмачки
     witchLegsGroup = new THREE.Group();
     witchLegsGroup.name = "WitchStripedLegs";
-    witchLegsGroup.position.set(WITCH_LANDING.x, 0.16, WITCH_LANDING.z + 0.12);
+    witchLegsGroup.position.set(0, -0.42, 0.18);
 
     const legMat = new THREE.MeshStandardMaterial({ map: stripesTexture, roughness: 0.65 });
     const shoeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.18 });
@@ -1362,27 +1502,25 @@
       legSub.position.set(lx, 0, 0);
 
       // Чулки
-      const legGeo = new THREE.CylinderGeometry(0.038, 0.042, 0.38, 12);
-      legGeo.rotateX(Math.PI / 2.3);
+      const legGeo = new THREE.CylinderGeometry(0.035, 0.038, 0.35, 12);
+      legGeo.rotateZ(Math.PI / 2);
       const legMesh = new THREE.Mesh(legGeo, legMat);
       legSub.add(legMesh);
 
       // Серебряный башмачок с загнутым сказочным носком
       const shoeGroup = new THREE.Group();
-      shoeGroup.position.set(0, -0.02, 0.22);
+      shoeGroup.position.set(0, -0.18, 0.05);
 
-      const shoeBody = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.14), shoeMat);
+      const shoeBody = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, 0.05), shoeMat);
       shoeGroup.add(shoeBody);
 
-      // Загнутый носок
-      const toeTip = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.08, 8), shoeMat);
+      const toeTip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.08, 8), shoeMat);
       toeTip.rotation.x = -Math.PI / 3;
-      toeTip.position.set(0, 0.025, 0.08);
+      toeTip.position.set(0, -0.06, 0.05);
       shoeGroup.add(toeTip);
 
-      // Сверкающая пряжка
       const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.02), rubyMat);
-      buckle.position.set(0, 0.03, 0.02);
+      buckle.position.set(0, 0.01, 0.04);
       shoeGroup.add(buckle);
 
       legSub.add(shoeGroup);
@@ -1390,14 +1528,15 @@
     });
 
     witchLegsGroup.visible = false;
-    dioramaGroup.add(witchLegsGroup);
+    clearingGroup.add(witchLegsGroup);
   }
 
   // ─── 3D TORNADO (УРАГАН) ─────────────────────────────
   function createTornado() {
     tornadoGroup = new THREE.Group();
     tornadoGroup.name = "TornadoVortex";
-    tornadoGroup.position.copy(TORNADO_ORIGIN);
+    tornadoGroup.position.copy(TORNADO_POSTER_POS);
+    tornadoGroup.scale.setScalar(0.08);
     dioramaGroup.add(tornadoGroup);
 
     tornadoRings = [];
@@ -1705,9 +1844,9 @@
     const c2 = new THREE.Color(0xffffff);
 
     for (let i = 0; i < count; i++) {
-      pos[i * 3]     = WITCH_LANDING.x + (Math.random() - 0.5) * 0.7;
-      pos[i * 3 + 1] = 0.2 + Math.random() * 0.5;
-      pos[i * 3 + 2] = WITCH_LANDING.z + 0.3 + (Math.random() - 0.5) * 0.5;
+      pos[i * 3]     = (Math.random() - 0.5) * 0.6;
+      pos[i * 3 + 1] = -0.42 + (Math.random() - 0.5) * 0.3;
+      pos[i * 3 + 2] = 0.22 + (Math.random() - 0.5) * 0.3;
 
       const c = (i % 2 === 0) ? c1 : c2;
       col[i * 3]     = c.r;
@@ -1734,7 +1873,47 @@
     });
 
     starSparklesPoints = new THREE.Points(sGeo, sMat);
-    dioramaGroup.add(starSparklesPoints);
+    if (clearingGroup) clearingGroup.add(starSparklesPoints);
+  }
+
+  // ─── SWIPE TRAIL & INTERACTION EVENTS ────────────────
+  // ─── GYROSCOPE & AIMING DETECTION ────────────────────
+  function initGyroscope() {
+    if (typeof DeviceOrientationEvent !== 'undefined') {
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission().then(resp => {
+          if (resp === 'granted') {
+            window.addEventListener('deviceorientation', onOrientationChange);
+          }
+        }).catch(() => {});
+      } else {
+        window.addEventListener('deviceorientation', onOrientationChange);
+      }
+    }
+  }
+
+  function onOrientationChange(e) {
+    if (e.beta === null || e.gamma === null) return;
+    if (!gyroActive) {
+      gyroActive = true;
+      gyroZeroBeta = e.beta;
+      gyroZeroGamma = e.gamma;
+    }
+    const dBeta = (e.beta - gyroZeroBeta) * (Math.PI / 180);
+    const dGamma = (e.gamma - gyroZeroGamma) * (Math.PI / 180);
+    camGyroPitch = THREE.MathUtils.clamp(-dBeta * 0.85, -0.65, 0.65);
+    camGyroYaw   = THREE.MathUtils.clamp(-dGamma * 0.85, -0.95, 0.95);
+  }
+
+  function checkAimAtPoster() {
+    if (!posterGroup || !tCamera) return false;
+    const wp = new THREE.Vector3();
+    posterGroup.getWorldPosition(wp);
+    const sp = wp.clone().project(tCamera);
+    // Находится перед камерой и близко к центру экрана
+    const inFront = sp.z > 0 && sp.z < 1.0;
+    const distFromCenter = Math.hypot(sp.x, sp.y);
+    return inFront && distFromCenter < 0.42;
   }
 
   // ─── SWIPE TRAIL & INTERACTION EVENTS ────────────────
@@ -1745,11 +1924,20 @@
     swipeCanvasCtx = swipeTrailEl.getContext('2d');
   }
 
+  let isCamDrag = false;
+  let camDragStart = { x: 0, y: 0 };
+
   function setupSwipeEvents() {
     if (!threeCont) return;
 
     threeCont.addEventListener('pointerdown', e => {
       if (S.scene !== 1 || houseState !== 'ORBITING') return;
+      if (e.button === 2) {
+        // Правая кнопка мыши для осмотра на ПК
+        isCamDrag = true;
+        camDragStart = { x: e.clientX, y: e.clientY };
+        return;
+      }
       isPointerDown = true;
       pointerStart = { x: e.clientX, y: e.clientY, time: performance.now() };
       pointerLast  = { x: e.clientX, y: e.clientY };
@@ -1758,16 +1946,25 @@
     });
 
     window.addEventListener('pointermove', e => {
+      if (isCamDrag) {
+        const dx = e.clientX - camDragStart.x;
+        const dy = e.clientY - camDragStart.y;
+        camGyroYaw   += (dx / window.innerWidth) * 1.5;
+        camGyroPitch += (dy / window.innerHeight) * 1.5;
+        camDragStart = { x: e.clientX, y: e.clientY };
+        return;
+      }
       if (!isPointerDown || S.scene !== 1) return;
       pointerLast = { x: e.clientX, y: e.clientY };
       swipeTrailPoints.push({ x: e.clientX, y: e.clientY, time: performance.now() });
 
-      // Наклон урагана во время свайпа пальцем
+      // Наклон урагана во время жеста
       const dx = e.clientX - pointerStart.x;
-      tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.75;
+      tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.85;
     });
 
     const endSwipe = () => {
+      isCamDrag = false;
       if (!isPointerDown || S.scene !== 1) return;
       isPointerDown = false;
       const dt = performance.now() - pointerStart.time;
@@ -1776,9 +1973,8 @@
       const dist = Math.sqrt(dx * dx + dy * dy);
       const speed = dist / (dt || 1);
 
-      // Срабатывает как при глубоком свайпе, так и при резком жесте (флик)
-      if (dist > 38 || (speed > 0.32 && dist > 18)) {
-        registerSwipe(dx >= 0 ? 1 : -1);
+      if (dist > 30 || (speed > 0.25 && dist > 14)) {
+        handleSwipeGesture(dx, dy);
       } else {
         tornadoTiltTarget.z = 0;
       }
@@ -1787,79 +1983,103 @@
     window.addEventListener('pointerup', endSwipe);
     window.addEventListener('pointercancel', endSwipe);
 
-    // Дополнительный клик по подсказке или сцене, чтобы никто не застрял
+    // Клик по подсказке внизу
     if (swipeHint) {
       swipeHint.addEventListener('click', () => {
-        if (S.scene === 1 && houseState === 'ORBITING') registerSwipe(1);
+        if (S.scene === 1 && houseState === 'ORBITING') handleSwipeGesture(0, -60);
       });
     }
   }
 
-  // ─── 3-SWIPE MECHANIC ────────────────────────────────
-  function registerSwipe(dirX = 1) {
-    if (houseState !== 'ORBITING' || swipeCount >= 3) return;
+  // ─── 2-SWIPE AR MECHANIC ──────────────────────────────
+  function handleSwipeGesture(dx, dy) {
+    if (houseState !== 'ORBITING') return;
+
+    // Проверяем, наведена ли камера на афишу
+    const aimed = checkAimAtPoster();
+
+    if (!aimed) {
+      // Пользователь смахнул, когда НЕ наведен на афишу:
+      // Ураган физически толкается по комнате в направлении свайпа
+      const pushX = (dx / window.innerWidth) * 8.5;
+      const pushZ = (dy / window.innerHeight) * 8.5;
+      tornadoVel.x += pushX;
+      tornadoVel.z += pushZ;
+      tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.95;
+      tornadoTiltTarget.x = (dy / window.innerHeight) * 0.95;
+      sfx.whoosh();
+
+      // Моргающая надпись с предупреждением!
+      if (arWarningBanner) {
+        arWarningBanner.style.display = 'block';
+        arWarningBanner.textContent = '⚠️ НАВЕДИТЕСЬ КАМЕРОЙ НА АФИШУ!';
+      }
+      if (swipeHintText) {
+        swipeHintText.textContent = '⚠️ Наведите камеру на афишу, чтобы остановить бурю!';
+      }
+      return;
+    }
+
+    // Камера наведена на афишу! Засчитываем результативный свайп (всего 2 свайпа)
     swipeCount++;
     sfx.whoosh();
 
     if (swipeCount === 1) {
       if (gem1) { gem1.classList.add('active'); gem1.textContent = '⚡'; }
-      tornadoTiltTarget.z = -dirX * 0.38;
-      tornadoTiltTarget.x = 0.16;
-      tornadoSpeedMult = 0.85;
-      if (swipeHintText) swipeHintText.textContent = '1-й порыв! Ураган слабеет! (Осталось 2 свайпа)';
-      badge.textContent = '🌪️ Сцена 1 — 1/3 свайпа';
-      doFlash('rgba(0, 255, 162, 0.35)', 160);
-      setTimeout(() => { if (swipeCount === 1) tornadoTiltTarget.z = 0; }, 750);
-    } else if (swipeCount === 2) {
+      tornadoTiltTarget.z = -(dx >= 0 ? 1 : -1) * 0.65;
+      tornadoTiltTarget.x = 0.45;
+      tornadoSpeedMult = 0.75;
+      tornadoVel.z -= 3.5; // отбрасываем ураган назад к афише
+      sfx.snap();
+      doFlash('rgba(0, 255, 162, 0.45)', 180);
+      if (swipeHintText) swipeHintText.textContent = '⚡ 1-й свайп! Ураган слабеет! Ещё один свайп на афишу!';
+      setTimeout(() => { if (swipeCount === 1) { tornadoTiltTarget.z = 0; tornadoTiltTarget.x = 0; } }, 750);
+    } else if (swipeCount >= 2) {
       if (gem2) { gem2.classList.add('active'); gem2.textContent = '⚡'; }
-      tornadoTiltTarget.z = -dirX * 0.68;
-      tornadoTiltTarget.x = 0.28;
-      tornadoSpeedMult = 0.68;
-      if (swipeHintText) swipeHintText.textContent = '2-й порыв! Ещё один сильный свайп!';
-      badge.textContent = '🌪️ Сцена 1 — 2/3 свайпа';
-      doFlash('rgba(0, 255, 162, 0.5)', 200);
-      setTimeout(() => { if (swipeCount === 2) tornadoTiltTarget.z = 0; }, 750);
-    } else if (swipeCount >= 3) {
-      if (gem3) { gem3.classList.add('active'); gem3.textContent = '⚡'; }
-      if (swipeHintText) swipeHintText.textContent = '🎉 Ураган рассеян! Домик летит на дом ведьмы!';
-      badge.textContent = '✨ Сцена 1 — Победа над бурей!';
-      doFlash('#aa88ff', 350);
+      if (swipeHintText) swipeHintText.textContent = '🎉 Ураган рассеян! Домик летит на дом Ведьмы!';
+      doFlash('#00ffa2', 350);
 
-      // Запускаем развеивание урагана и баллистический полёт домика
-      blowTornadoAndLaunchHouse(dirX);
+      // Запускаем развеивание урагана и баллистический полёт домика на избушку Ведьмы на афише!
+      blowTornadoAndLaunchHouse(dx >= 0 ? 1 : -1);
     }
   }
 
   function blowTornadoAndLaunchHouse(dirX = 1) {
     tornadoBlowAway = true;
-    tornadoBlowVel.set(dirX * 7.5, 2.2, -3.5);
+    tornadoBlowVel.set(dirX * 6.5, 3.5, -4.5);
 
     houseState = 'LAUNCHING';
     houseFlight.startTime = performance.now();
     houseFlight.duration = 1400; // 1.4 секунды полёта
     houseFlight.startPos.copy(houseGroup.position);
     houseFlight.startRot.copy(houseGroup.rotation);
+
+    // Цель — реальные 3D координаты избушки Ведьмы на афише
+    if (witchCottageGroup) {
+      witchCottageGroup.getWorldPosition(houseFlight.targetPos);
+    } else {
+      houseFlight.targetPos.set(0, 1.6, -2.7);
+    }
   }
 
   function onHouseLanded() {
     houseState = 'LANDED';
     houseBouncePhase = 0;
-    houseGroup.position.copy(WITCH_LANDING);
+    houseGroup.position.copy(houseFlight.targetPos);
     houseGroup.rotation.set(0, 0.12, 0);
 
-    // Звуки удара и торжества
+    // Звуки удара и победы
     sfx.snap();
     sfx.tada();
 
     // Облако пыли от удара
-    triggerDustBurst(WITCH_LANDING);
+    triggerDustBurst(houseFlight.targetPos);
 
-    // Показываем серебряные башмачки, выглядывающие из-под дома
+    // Показываем серебряные башмачки, выглядывающие из-под дома на афише
     if (witchLegsGroup) witchLegsGroup.visible = true;
-    if (starSparklesPoints) starSparklesPoints.material.opacity = 0.9;
+    if (starSparklesPoints) starSparklesPoints.material.opacity = 0.95;
 
-    if (swipeHintText) swipeHintText.textContent = '👠 Домик упал на дом Злой Ведьмы! Буря утихла!';
-    badge.textContent = '👠 Сцена 1 — Серебряные башмачки!';
+    if (swipeHintText) swipeHintText.textContent = '👠 Домик Элли раздавил дом Злой Ведьмы! Буря утихла!';
 
     // Через 2.5 секунды переходим к Сцене 2 (Изумрудный Город)
     setTimeout(() => {
@@ -1885,7 +2105,56 @@
     const dt = Math.min(tClock ? tClock.getDelta() : 0.016, 0.05);
     const elapsed = tClock ? tClock.getElapsedTime() : (time * 0.001);
 
-    // 1. Анимация урагана (вращение, изгиб, развеивание)
+    // Обновление ориентации камеры от гироскопа / drag
+    if (tCamera) {
+      tCamera.rotation.x = THREE.MathUtils.lerp(tCamera.rotation.x, camGyroPitch, dt * 5);
+      tCamera.rotation.y = THREE.MathUtils.lerp(tCamera.rotation.y, camGyroYaw, dt * 5);
+    }
+
+    // 1. Анимация вылета урагана из афиши и его физика в комнате
+    if (tornadoState === 'ERUPTING') {
+      const ep = Math.min(1.0, (time - eruptionStartTime) / ERUPTION_DURATION);
+      const ease = 1 - Math.pow(1 - ep, 3);
+      tornadoGroup.position.lerpVectors(TORNADO_POSTER_POS, TORNADO_ROOM_DEFAULT, ease);
+      tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.95;
+      tornadoGroup.scale.setScalar(THREE.MathUtils.lerp(0.08, 1.0, ease));
+
+      if (ep >= 1.0) {
+        tornadoState = 'ROAMING';
+        tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
+        tornadoGroup.scale.setScalar(1.0);
+        if (swipeHintText) swipeHintText.textContent = 'Наведите камеру на афишу и смахните 2 раза!';
+      }
+    } else if (tornadoState === 'ROAMING' && !tornadoBlowAway) {
+      // Ураган парит и медленно перемещается по комнате
+      tornadoVel.x += Math.sin(elapsed * 1.5) * 0.008;
+      tornadoVel.z += Math.cos(elapsed * 1.2) * 0.008;
+      tornadoGroup.position.x += tornadoVel.x * dt;
+      tornadoGroup.position.z += tornadoVel.z * dt;
+      tornadoVel.multiplyScalar(0.93);
+
+      // Ограничение по зоне видимости комнаты
+      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -2.4, 2.4);
+      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -1.8, 1.8);
+      tornadoGroup.position.y = 0.0;
+
+      // Проверка прицеливания на афишу в реальном времени
+      isAimedAtPoster = checkAimAtPoster();
+      if (arReticle) {
+        if (isAimedAtPoster) {
+          arReticle.classList.add('aimed');
+          if (arReticleStatus) arReticleStatus.textContent = '🎯 АФИША В ПРИЦЕЛЕ!';
+          if (arWarningBanner && arWarningBanner.style.display !== 'none') {
+            arWarningBanner.style.display = 'none';
+          }
+        } else {
+          arReticle.classList.remove('aimed');
+          if (arReticleStatus) arReticleStatus.textContent = '🔍 ИЩЕМ АФИШУ...';
+        }
+      }
+    }
+
+    // Наклон и развеивание урагана
     tornadoTiltCurrent.z = THREE.MathUtils.lerp(tornadoTiltCurrent.z, tornadoTiltTarget.z, dt * 6);
     tornadoTiltCurrent.x = THREE.MathUtils.lerp(tornadoTiltCurrent.x, tornadoTiltTarget.x, dt * 6);
 
@@ -1899,6 +2168,10 @@
     } else {
       tornadoGroup.rotation.z = tornadoTiltCurrent.z;
       tornadoGroup.rotation.x = tornadoTiltCurrent.x;
+    }
+
+    if (vortexLight) {
+      vortexLight.position.set(tornadoGroup.position.x, tornadoGroup.position.y + 2.2, tornadoGroup.position.z);
     }
 
     const spinRate = (4.8 * tornadoSpeedMult) * dt;
@@ -1944,13 +2217,13 @@
     if (houseState === 'ORBITING') {
       const orbitSpeed = (2.5 * tornadoSpeedMult) * dt;
       const hAngle = elapsed * 2.2 * tornadoSpeedMult;
-      const orbitR = 1.48;
+      const orbitR = 1.35;
       const bobY = Math.sin(elapsed * 4.2) * 0.16;
 
       houseGroup.position.set(
-        TORNADO_ORIGIN.x + Math.cos(hAngle) * orbitR,
-        2.25 + bobY,
-        TORNADO_ORIGIN.z + Math.sin(hAngle) * orbitR
+        tornadoGroup.position.x + Math.cos(hAngle) * orbitR,
+        tornadoGroup.position.y + 2.25 + bobY,
+        tornadoGroup.position.z + Math.sin(hAngle) * orbitR
       );
 
       houseGroup.rotation.y = -hAngle + Math.PI / 4;
@@ -1963,7 +2236,7 @@
       });
 
     } else if (houseState === 'LAUNCHING') {
-      // Баллистический полёт на домик Злой Ведьмы
+      // Баллистический полёт на домик Злой Ведьмы на афише
       const p = Math.min(1.0, (time - houseFlight.startTime) / houseFlight.duration);
       const easeOut = 1 - Math.pow(1 - p, 2);
 
@@ -1990,7 +2263,7 @@
         const damping = Math.exp(-4.5 * b);
 
         const bounceY = Math.abs(Math.sin(b * Math.PI * 3.0)) * 0.32 * damping;
-        houseGroup.position.y = WITCH_LANDING.y + bounceY;
+        houseGroup.position.y = houseFlight.targetPos.y + bounceY;
 
         const squash = Math.sin(b * Math.PI * 6.0) * 0.16 * damping;
         houseGroup.scale.set(1 + squash, 1 - squash, 1 + squash);
@@ -2002,10 +2275,11 @@
         // Выдвигаем ножки ведьмы с серебряными туфельками
         legsSlide = Math.min(1.0, b * 1.8);
         if (witchLegsGroup) {
-          witchLegsGroup.position.z = WITCH_LANDING.z + 0.12 + legsSlide * 0.38;
+          witchLegsGroup.position.y = -0.42 - legsSlide * 0.14;
+          witchLegsGroup.position.z = 0.18 + legsSlide * 0.22;
         }
       } else {
-        houseGroup.position.copy(WITCH_LANDING);
+        houseGroup.position.copy(houseFlight.targetPos);
         houseGroup.scale.setScalar(1.0);
         if (witchCottageGroup) witchCottageGroup.scale.set(1.15, 0.12, 1.15);
       }
