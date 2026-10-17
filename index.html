@@ -805,6 +805,7 @@
   if (btnRequestCam) {
     btnRequestCam.addEventListener('click', () => {
       getCtx();
+      initGyroscope();
       startCamera({ silent: false });
     });
   }
@@ -971,18 +972,21 @@
   let tornadoSquashCurrent   = 1.0;
   let tornadoSquashTarget    = 1.0;
 
-  // Ураган в пространстве: ERUPTING | ROAMING
-  let tornadoState = 'ERUPTING';
+  // Ураган в пространстве: Сразу ROAMING прямо перед зрителем на полу/столе
+  let tornadoState = 'ROAMING';
   let eruptionStartTime = 0;
   const ERUPTION_DURATION = 1800;
   const TORNADO_POSTER_POS   = new THREE.Vector3(0, 1.40, -2.75);
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, 0.0, 0.35);
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, 0.0, 0.2);
   let tornadoVel = new THREE.Vector3(0, 0, 0);
   let isAimedAtPoster = false;
 
-  // Гироскоп и ориентация камеры смартфона
-  let gyroActive = false, gyroZeroBeta = null, gyroZeroGamma = null;
-  let camGyroPitch = 0, camGyroYaw = 0;
+  // Базовый масштаб урагана для MR (помещается в комнате и на столе в поле зрения)
+  const TORNADO_BASE_SCALE = 0.32;
+
+  // Гироскоп и ориентация камеры смартфона (~-18° естественный наклон камеры на пол/стол)
+  let gyroActive = false;
+  let camGyroPitch = -0.32, camGyroYaw = 0;
 
   const houseFlight = {
     startTime: 0,
@@ -1014,8 +1018,8 @@
     const aspect = w / h;
 
     tCamera = new THREE.PerspectiveCamera(aspect < 1 ? 55 : 46, aspect, 0.1, 100);
-    tCamera.position.set(0, 1.35, 2.4);
-    tCamera.lookAt(0, 1.1, -1.2);
+    tCamera.position.set(0, 1.25, 2.0);
+    tCamera.rotation.set(-0.32, 0, 0);
 
     tRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     tRenderer.setSize(w, h);
@@ -1068,9 +1072,11 @@
 
     window.addEventListener('resize', onThreeResize);
 
-    // Eruption start
-    tornadoState = 'ERUPTING';
-    eruptionStartTime = performance.now();
+    // Сразу активен в комнате/на столе перед камерой
+    tornadoState = 'ROAMING';
+    tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
+    tornadoGroup.scale.setScalar(TORNADO_BASE_SCALE);
+    tornadoGroup.visible = true;
     swipeCount = 0;
 
     // 6. Start animation loop
@@ -1477,8 +1483,9 @@
   function createTornado() {
     tornadoGroup = new THREE.Group();
     tornadoGroup.name = "TornadoVortex";
-    tornadoGroup.position.copy(TORNADO_POSTER_POS);
-    tornadoGroup.scale.setScalar(0.08);
+    tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
+    tornadoGroup.scale.setScalar(TORNADO_BASE_SCALE);
+    tornadoGroup.visible = true;
     dioramaGroup.add(tornadoGroup);
 
     tornadoRings = [];
@@ -1544,7 +1551,7 @@
     tornadoGroup.add(groundSwirlMesh);
 
     // Абразивный диск контакта с реальным полом комнаты (MR Floor Abrasion Contact Decal)
-    const floorContactGeo = new THREE.PlaneGeometry(2.35, 2.35);
+    const floorContactGeo = new THREE.PlaneGeometry(1.6, 1.6);
     floorContactGeo.rotateX(-Math.PI / 2);
     const floorContactMat = new THREE.MeshBasicMaterial({
       map: floorAbrasionTexture,
@@ -1756,6 +1763,7 @@
     addWindow(0.505, 0.48, -0.06, Math.PI / 2);
 
     cabin.position.y = -0.45;
+    cabin.scale.setScalar(0.45);
     houseGroup.add(cabin);
     dioramaGroup.add(houseGroup);
   }
@@ -1906,16 +1914,22 @@
   }
 
   function onOrientationChange(e) {
-    if (e.beta === null || e.gamma === null) return;
-    if (!gyroActive) {
-      gyroActive = true;
-      gyroZeroBeta = e.beta;
-      gyroZeroGamma = e.gamma;
+    if (e.beta === null) return;
+    gyroActive = true;
+
+    // В портретном режиме (на смартфоне):
+    // e.beta: 90° = телефон вертикально (камера горизонтально, pitch = 0°)
+    // e.beta: 45°..65° = телефон наклонен вперед на стол/пол (pitch = -25°..-45°)
+    // e.beta: 110° = телефон отклонен назад на потолок (pitch = +20°)
+    // В Three.js наклон камеры вниз — это ОТРИЦАТЕЛЬНЫЙ угол по X!
+    const targetPitch = (e.beta - 90) * (Math.PI / 180);
+    camGyroPitch = THREE.MathUtils.clamp(targetPitch, -1.15, 0.45);
+
+    // Рыскание/крен (gamma):
+    if (e.gamma !== null) {
+      const gNorm = THREE.MathUtils.clamp(e.gamma / 45, -1, 1);
+      camGyroYaw = THREE.MathUtils.clamp(-gNorm * 0.45, -0.65, 0.65);
     }
-    const dBeta = (e.beta - gyroZeroBeta) * (Math.PI / 180);
-    const dGamma = (e.gamma - gyroZeroGamma) * (Math.PI / 180);
-    camGyroPitch = THREE.MathUtils.clamp(-dBeta * 0.85, -0.65, 0.65);
-    camGyroYaw   = THREE.MathUtils.clamp(-dGamma * 0.85, -0.95, 0.95);
   }
 
   // ─── OPTICAL IMAGE TRACKING (MINDAR) ─────────────────
@@ -2017,7 +2031,8 @@
         const dx = e.clientX - camDragStart.x;
         const dy = e.clientY - camDragStart.y;
         camGyroYaw   += (dx / window.innerWidth) * 1.5;
-        camGyroPitch += (dy / window.innerHeight) * 1.5;
+        camGyroPitch -= (dy / window.innerHeight) * 1.5;
+        camGyroPitch  = THREE.MathUtils.clamp(camGyroPitch, -1.15, 0.45);
         camDragStart = { x: e.clientX, y: e.clientY };
         return;
       }
@@ -2186,8 +2201,8 @@
 
     // Обновление ориентации камеры от гироскопа / drag
     if (tCamera) {
-      tCamera.rotation.x = THREE.MathUtils.lerp(tCamera.rotation.x, camGyroPitch, dt * 5);
-      tCamera.rotation.y = THREE.MathUtils.lerp(tCamera.rotation.y, camGyroYaw, dt * 5);
+      tCamera.rotation.x = THREE.MathUtils.lerp(tCamera.rotation.x, camGyroPitch, dt * 6);
+      tCamera.rotation.y = THREE.MathUtils.lerp(tCamera.rotation.y, camGyroYaw, dt * 6);
     }
 
     // 0. Поляна с домиком Ведьмы отображается СТРОГО на реальной афише!
@@ -2196,67 +2211,53 @@
       posterGroup.visible = (opticalTargetDetected === true || houseState === 'LAUNCHING' || houseState === 'LANDED');
     }
 
-    // 1. Анимация вылета урагана из афиши и его физика в комнате
-    if (tornadoState === 'ERUPTING') {
-      const ep = Math.min(1.0, (time - eruptionStartTime) / ERUPTION_DURATION);
-      const ease = 1 - Math.pow(1 - ep, 3);
-      tornadoGroup.position.lerpVectors(TORNADO_POSTER_POS, TORNADO_ROOM_DEFAULT, ease);
-      tornadoGroup.position.y += Math.sin(ep * Math.PI) * 0.95;
-      tornadoGroup.scale.setScalar(THREE.MathUtils.lerp(0.08, 1.0, ease));
-
-      if (ep >= 1.0) {
-        tornadoState = 'ROAMING';
-        tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
-        tornadoGroup.scale.setScalar(1.0);
-      }
-    } else if (tornadoState === 'ROAMING' && !tornadoBlowAway) {
-      // 1. Плавное движение урагана по полу комнаты с физической инерцией
-      tornadoVel.x += Math.sin(elapsed * 1.5) * 0.008;
-      tornadoVel.z += Math.cos(elapsed * 1.2) * 0.008;
+    // 1. Анимация урагана в комнате / на столе
+    if (tornadoState === 'ROAMING' && !tornadoBlowAway) {
+      // 1. Плавное естественное покачивание урагана по поверхности
+      tornadoVel.x += Math.sin(elapsed * 1.5) * 0.005;
+      tornadoVel.z += Math.cos(elapsed * 1.2) * 0.005;
       tornadoGroup.position.x += tornadoVel.x * dt;
       tornadoGroup.position.z += tornadoVel.z * dt;
       tornadoVel.multiplyScalar(0.92);
 
       // 2. Адаптация высоты (Пол 0м, стул/бордюр ~0.4м, стол ~0.75м)
-      // Если телефон направлен вниз (камера смотрит под ноги в пол) — автоматически пол
-      if (camGyroPitch > 0.35) {
+      // Если телефон направлен круто вниз (камера смотрит под ноги в пол) — автоматически пол
+      if (camGyroPitch < -0.75) {
         groundElevationTarget = 0.0;
       }
       groundElevationCurrent = THREE.MathUtils.lerp(groundElevationCurrent, groundElevationTarget, dt * 5.0);
       tornadoGroup.position.y = groundElevationCurrent;
 
-      // 3. Естественные границы видимости камеры (Camera Frustum)
-      // При встрече с краем видимой зоны или препятствием ураган упруго сжимается (Squash & Stretch),
-      // выбивает искры пыли и пружинит обратно в поле зрения!
+      // 3. Удержание урагана в поле зрения камеры (по центру вихря, а не подошве)
       if (tCamera) {
-        const sp = tornadoGroup.position.clone().project(tCamera);
-        let bounced = false;
-        let nx = 0, nz = 0;
+        const centerPos = tornadoGroup.position.clone();
+        centerPos.y += 0.55;
+        const sp = centerPos.project(tCamera);
 
-        if (sp.x > 0.82) {
-          tornadoVel.x = -Math.abs(tornadoVel.x) * 0.75 - 0.45;
-          nx = -1; bounced = true;
-        } else if (sp.x < -0.82) {
-          tornadoVel.x = Math.abs(tornadoVel.x) * 0.75 + 0.45;
-          nx = 1; bounced = true;
+        if (sp.x > 0.72) {
+          tornadoVel.x = -Math.abs(tornadoVel.x) * 0.7 - 0.35;
+          triggerObstacleImpact(tornadoGroup.position, new THREE.Vector3(-1, 0, 0));
+        } else if (sp.x < -0.72) {
+          tornadoVel.x = Math.abs(tornadoVel.x) * 0.7 + 0.35;
+          triggerObstacleImpact(tornadoGroup.position, new THREE.Vector3(1, 0, 0));
         }
 
-        if (sp.y > 0.78) {
-          tornadoVel.z = Math.abs(tornadoVel.z) * 0.75 + 0.45;
-          nz = 1; bounced = true;
-        } else if (sp.y < -0.78) {
-          tornadoVel.z = -Math.abs(tornadoVel.z) * 0.75 - 0.45;
-          nz = -1; bounced = true;
-        }
-
-        if (bounced) {
-          triggerObstacleImpact(tornadoGroup.position, new THREE.Vector3(nx, 0, nz));
+        if (sp.y < -0.65) {
+          tornadoVel.z = -Math.abs(tornadoVel.z) * 0.7 - 0.35;
+        } else if (sp.y > 0.65) {
+          tornadoVel.z = Math.abs(tornadoVel.z) * 0.7 + 0.35;
         }
       }
 
-      // Физические пределы в произвольном помещении (радиус ~2.4м вокруг зрителя)
-      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -2.4, 2.4);
-      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -2.6, 1.25);
+      // Безопасные границы вокруг пользователя (в пределах видимости)
+      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -1.2, 1.2);
+      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -0.6, 0.7);
+
+      // Фэйлсейф сброс, если ураган улетел слишком далеко
+      if (tornadoGroup.position.distanceTo(tCamera.position) > 4.0 || isNaN(tornadoGroup.position.x)) {
+        tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
+        tornadoVel.set(0, 0, 0);
+      }
 
       // Проверка прицеливания на афишу в реальном времени
       isAimedAtPoster = checkAimAtPoster();
@@ -2283,7 +2284,7 @@
       if (vortexParticles) vortexParticles.material.opacity = tornadoOpacity * 0.55;
       if (floorContactMesh) floorContactMesh.material.opacity = tornadoOpacity * 0.85;
     } else {
-      tornadoGroup.scale.set(invSq, tornadoSquashCurrent, invSq);
+      tornadoGroup.scale.set(TORNADO_BASE_SCALE * invSq, TORNADO_BASE_SCALE * tornadoSquashCurrent, TORNADO_BASE_SCALE * invSq);
       tornadoGroup.rotation.z = tornadoTiltCurrent.z;
       tornadoGroup.rotation.x = tornadoTiltCurrent.x;
     }
@@ -2292,14 +2293,14 @@
     if (floorContactMesh) {
       floorContactMesh.position.set(tornadoGroup.position.x, groundElevationCurrent + 0.005, tornadoGroup.position.z);
       floorContactMesh.rotation.y += spinRate * 2.0;
-      floorContactMesh.scale.setScalar(tornadoGroup.scale.x * (0.96 + Math.sin(elapsed * 5.0) * 0.05));
+      floorContactMesh.scale.setScalar((tornadoGroup.scale.x / TORNADO_BASE_SCALE) * (0.96 + Math.sin(elapsed * 5.0) * 0.05));
       if (!tornadoBlowAway) {
         floorContactMesh.material.opacity = tornadoOpacity * 0.88;
       }
     }
 
     if (vortexLight) {
-      vortexLight.position.set(tornadoGroup.position.x, tornadoGroup.position.y + 2.2, tornadoGroup.position.z);
+      vortexLight.position.set(tornadoGroup.position.x, tornadoGroup.position.y + 0.85, tornadoGroup.position.z);
     }
 
     const spinRate = (4.8 * tornadoSpeedMult) * dt;
@@ -2345,12 +2346,12 @@
     if (houseState === 'ORBITING') {
       const orbitSpeed = (2.5 * tornadoSpeedMult) * dt;
       const hAngle = elapsed * 2.2 * tornadoSpeedMult;
-      const orbitR = 1.35;
-      const bobY = Math.sin(elapsed * 4.2) * 0.16;
+      const orbitR = 0.65;
+      const bobY = Math.sin(elapsed * 4.2) * 0.08;
 
       houseGroup.position.set(
         tornadoGroup.position.x + Math.cos(hAngle) * orbitR,
-        tornadoGroup.position.y + 2.25 + bobY,
+        tornadoGroup.position.y + 0.95 + bobY,
         tornadoGroup.position.z + Math.sin(hAngle) * orbitR
       );
 
