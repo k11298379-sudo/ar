@@ -116,6 +116,7 @@
               window.opticalTargetDetected = true;
               opticalTargetMatrix = data.worldMatrix;
               opticalLastSeenTime = performance.now();
+              window.opticalLastSeenTime = opticalLastSeenTime;
 
               // Матрица трансформации относительно камеры
               const m = new THREE.Matrix4().fromArray(data.worldMatrix);

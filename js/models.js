@@ -8,7 +8,7 @@
   // Константы позиционирования для MR
   const TORNADO_POSTER_POS   = new THREE.Vector3(0.06, -0.38, -0.80); // зарождается у домика Ведьмы в глубине портала
   const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.62, 0.16); // приземляется перед афишей на стол/клавиатуру (+16см к пользователю)
-  const TORNADO_BASE_SCALE   = 0.52; // базовый масштаб вихря (~1.3м высота)
+  const TORNADO_BASE_SCALE   = 0.70; // масштаб вихря (~1.7м высота в реальном масштабе)
 
   window.TORNADO_POSTER_POS   = TORNADO_POSTER_POS;
   window.TORNADO_ROOM_DEFAULT = TORNADO_ROOM_DEFAULT;
@@ -615,7 +615,7 @@
 
   // ─── 3D-ВИХРЬ УРАГАНА ─────────────────────────────────
   function createTornado() {
-    const parentGroup = window.roomTornadoRoot || window.dioramaGroup;
+    const parentGroup = window.dioramaGroup || window.tScene;
     tornadoGroup = new THREE.Group();
     tornadoGroup.name = "TornadoVortex";
     tornadoGroup.position.copy(TORNADO_POSTER_POS);
@@ -699,7 +699,7 @@
     floorContactMesh = new THREE.Mesh(floorContactGeo, floorContactMat);
     floorContactMesh.position.set(0, 0.005, 0);
     floorContactMesh.visible = false;
-    if (parentGroup) parentGroup.add(floorContactMesh);
+    tornadoGroup.add(floorContactMesh);
 
     // 650 аккуратных частиц вихря (размер 0.045 вместо 0.44!)
     const pCount = 650;
@@ -911,10 +911,10 @@
     addWindow(0.505, 0.48, -0.06, Math.PI / 2);
 
     cabin.position.y = -0.05;
-    cabin.scale.setScalar(0.18);
+    cabin.scale.setScalar(0.22);
     houseGroup.add(cabin);
     houseGroup.visible = false;
-    const parentGroup = window.roomTornadoRoot || window.dioramaGroup;
+    const parentGroup = window.tornadoGroup || window.roomTornadoRoot || window.dioramaGroup;
     if (parentGroup) parentGroup.add(houseGroup);
 
     window.houseGroup = houseGroup;
