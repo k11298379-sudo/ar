@@ -4,6 +4,6 @@
 *.key
 *.bat
 server.py
-AR_Emerald_City.zip
+*.zip
 __pycache__
 README.md
