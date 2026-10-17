@@ -76,6 +76,14 @@
         camVideo.setAttribute('webkit-playsinline', '');
         camVideo.muted = true;
         await camVideo.play();
+
+        // ОБЯЗАТЕЛЬНО: задаём свойства и атрибуты width/height для MindAR InputLoader!
+        const vw = camVideo.videoWidth || 1280;
+        const vh = camVideo.videoHeight || 720;
+        camVideo.setAttribute('width', vw);
+        camVideo.setAttribute('height', vh);
+        camVideo.width = vw;
+        camVideo.height = vh;
       }
 
       cameraActive = true;

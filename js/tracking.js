@@ -79,8 +79,24 @@
           setTimeout(resolve, 800);
         });
       }
-      const vWidth = videoEl.videoWidth || 640;
-      const vHeight = videoEl.videoHeight || 480;
+
+      const vWidth = videoEl.videoWidth || 1280;
+      const vHeight = videoEl.videoHeight || 720;
+
+      // ОБЯЗАТЕЛЬНО: задаём свойства и атрибуты width/height для MindAR InputLoader!
+      videoEl.setAttribute('width', vWidth);
+      videoEl.setAttribute('height', vHeight);
+      videoEl.width = vWidth;
+      videoEl.height = vHeight;
+
+      videoEl.addEventListener('resize', () => {
+        if (videoEl.videoWidth && videoEl.videoHeight) {
+          videoEl.setAttribute('width', videoEl.videoWidth);
+          videoEl.setAttribute('height', videoEl.videoHeight);
+          videoEl.width = videoEl.videoWidth;
+          videoEl.height = videoEl.videoHeight;
+        }
+      });
 
       console.log(`[OpticalAR] Starting MindAR Controller (${vWidth}x${vHeight})...`);
       mindarController = new window.MindARController({
