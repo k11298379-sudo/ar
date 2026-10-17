@@ -1272,6 +1272,7 @@
     posterGroup.name = "AR_PosterTarget";
     posterGroup.position.set(0, 1.25, -2.8);
     posterGroup.rotation.x = -0.06;
+    posterGroup.visible = false; // Скрыта по умолчанию! Появляется СТРОГО на физической афише!
 
     // Рамка и полотно постера
     const postGeo = new THREE.BoxGeometry(2.4, 3.55, 0.04);
@@ -1961,8 +1962,8 @@
     if (!aimed) {
       // Пользователь смахнул, когда НЕ наведен на афишу:
       // Ураган физически толкается по комнате в направлении свайпа
-      const pushX = (dx / window.innerWidth) * 8.5;
-      const pushZ = (dy / window.innerHeight) * 8.5;
+      const pushX = THREE.MathUtils.clamp((dx / window.innerWidth) * 3.5, -1.8, 1.8);
+      const pushZ = THREE.MathUtils.clamp((dy / window.innerHeight) * 3.5, -1.8, 1.8);
       tornadoVel.x += pushX;
       tornadoVel.z += pushZ;
       tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.95;
@@ -2072,6 +2073,12 @@
       tCamera.rotation.y = THREE.MathUtils.lerp(tCamera.rotation.y, camGyroYaw, dt * 5);
     }
 
+    // 0. Поляна с домиком Ведьмы отображается СТРОГО на реальной афише!
+    // На столе или в воздухе они полностью скрыты!
+    if (posterGroup) {
+      posterGroup.visible = (opticalTargetDetected === true || houseState === 'LAUNCHING' || houseState === 'LANDED');
+    }
+
     // 1. Анимация вылета урагана из афиши и его физика в комнате
     if (tornadoState === 'ERUPTING') {
       const ep = Math.min(1.0, (time - eruptionStartTime) / ERUPTION_DURATION);
@@ -2084,7 +2091,6 @@
         tornadoState = 'ROAMING';
         tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
         tornadoGroup.scale.setScalar(1.0);
-        if (swipeHintText) swipeHintText.textContent = 'Наведите камеру на афишу и смахните 2 раза!';
       }
     } else if (tornadoState === 'ROAMING' && !tornadoBlowAway) {
       // Ураган парит и медленно перемещается по комнате
@@ -2092,11 +2098,33 @@
       tornadoVel.z += Math.cos(elapsed * 1.2) * 0.008;
       tornadoGroup.position.x += tornadoVel.x * dt;
       tornadoGroup.position.z += tornadoVel.z * dt;
-      tornadoVel.multiplyScalar(0.93);
+      tornadoVel.multiplyScalar(0.91);
 
-      // Ограничение по зоне видимости комнаты
-      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -2.4, 2.4);
-      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -1.8, 1.8);
+      // Проверяем экранные координаты центра урагана в камере смартфона (NDC от -1 до +1)
+      if (tCamera) {
+        const sp = tornadoGroup.position.clone().project(tCamera);
+
+        // Мягкий бампер от краев экрана: ураган плавно отскакивает и НИКОГДА не вылетает за экран!
+        if (sp.x > 0.50) {
+          tornadoVel.x = -Math.abs(tornadoVel.x) * 0.65 - 0.25;
+          tornadoGroup.position.x -= 0.035;
+        } else if (sp.x < -0.50) {
+          tornadoVel.x = Math.abs(tornadoVel.x) * 0.65 + 0.25;
+          tornadoGroup.position.x += 0.035;
+        }
+
+        if (sp.y > 0.40) {
+          tornadoVel.z = Math.abs(tornadoVel.z) * 0.65 + 0.25;
+          tornadoGroup.position.z += 0.035;
+        } else if (sp.y < -0.65) {
+          tornadoVel.z = -Math.abs(tornadoVel.z) * 0.65 - 0.25;
+          tornadoGroup.position.z -= 0.035;
+        }
+      }
+
+      // Строгие физические границы видимой зоны комнаты
+      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.65, 0.65);
+      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -0.25, 1.05);
       tornadoGroup.position.y = 0.0;
 
       // Проверка прицеливания на афишу в реальном времени
