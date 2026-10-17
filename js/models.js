@@ -7,7 +7,7 @@
 
   // Константы позиционирования для MR
   const TORNADO_POSTER_POS   = new THREE.Vector3(0.06, -0.38, -0.80); // зарождается у домика Ведьмы в глубине портала
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.55, 0.60); // приземляется перед афишей на стол (+60см к пользователю)
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.68, 0.55); // приземляется перед афишей на стол (+55см к пользователю)
   const TORNADO_BASE_SCALE   = 0.44; // базовый масштаб вихря (~1.1м высота)
 
   window.TORNADO_POSTER_POS   = TORNADO_POSTER_POS;
@@ -697,7 +697,7 @@
       depthWrite: false
     });
     floorContactMesh = new THREE.Mesh(floorContactGeo, floorContactMat);
-    floorContactMesh.position.set(tornadoGroup.position.x, TORNADO_ROOM_DEFAULT.y + 0.005, tornadoGroup.position.z);
+    floorContactMesh.position.set(0, 0.005, 0);
     floorContactMesh.visible = false;
     if (parentGroup) parentGroup.add(floorContactMesh);
 
@@ -924,15 +924,15 @@
 
   // ─── СИСТЕМА ОБЛАКОВ ПЫЛИ И ИСКР ───────────────────────
   function createDustBurstSystem() {
-    const dioramaGroup = window.dioramaGroup;
+    const parentGroup = window.tScene || window.roomTornadoRoot || window.dioramaGroup;
     dustBurstPuffs = [];
-    const geo = new THREE.DodecahedronGeometry(0.05, 1);
+    const geo = new THREE.DodecahedronGeometry(0.06, 1);
     for (let i = 0; i < 20; i++) {
       const mat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.9, transparent: true, opacity: 0 });
       const puff = new THREE.Mesh(geo, mat);
       puff.visible = false;
       puff.userData = { vel: new THREE.Vector3(), life: 0, maxLife: 0.75 };
-      if (dioramaGroup) dioramaGroup.add(puff);
+      if (parentGroup) parentGroup.add(puff);
       dustBurstPuffs.push(puff);
     }
     window.dustBurstPuffs = dustBurstPuffs;
@@ -1029,6 +1029,11 @@
   function handleSurfaceTap(clientX, clientY) {
     if (window.houseState !== 'ORBITING') return;
     const yRatio = clientY / window.innerHeight;
+
+    if (window.onSurfaceTapAction) {
+      window.onSurfaceTapAction(clientX, clientY, yRatio);
+      return;
+    }
 
     if (yRatio > 0.65) {
       setObstacleElevation(0.0);
