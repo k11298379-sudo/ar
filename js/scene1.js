@@ -30,30 +30,30 @@
 
   // Физика поверхностей (стол, ступени, пол) и гравитационный срыв с края
   let camGyroPitch = 0, camGyroYaw = 0;
-  const tornadoSimPos = new THREE.Vector3(0.0, -0.68, 0.55);
+  const tornadoSimPos = new THREE.Vector3(0.0, -0.62, 0.16);
   let tornadoFallVelY = 0.0;
   let currentSurfaceName = 'Стол';
   let isTornadoAirborne = false;
 
   function getRoomSurfaceElevation(lx, lz) {
-    // 1. Падение с бокового края стола (влево/вправо более 58 см) — на пол комнаты
-    if (Math.abs(lx) > 0.58) {
+    // 1. Падение с бокового края стола (влево/вправо более 48 см) — на пол комнаты
+    if (Math.abs(lx) > 0.48) {
       return { y: -1.45, tier: 'FLOOR', name: 'Пол' };
     }
-    // 2. Поверхность стола перед афишей (глубина стола до 72 см от афиши)
-    if (lz <= 0.72) {
-      return { y: -0.68, tier: 'TABLE', name: 'Стол' };
+    // 2. Поверхность стола перед афишей (глубина стола до 42 см от афиши)
+    if (lz <= 0.42) {
+      return { y: -0.62, tier: 'TABLE', name: 'Стол' };
     }
-    // 3. Ступень 1 / Стул перед столом (72 см - 105 см)
+    // 3. Ступень 1 / Стул перед столом (42 см - 75 см)
+    if (lz <= 0.75) {
+      return { y: -0.98, tier: 'STEP_1', name: 'Ступень 1' };
+    }
+    // 4. Ступень 2 / Промежуточный уступ лестницы (75 см - 105 см)
     if (lz <= 1.05) {
-      return { y: -1.02, tier: 'STEP_1', name: 'Ступень 1' };
+      return { y: -1.30, tier: 'STEP_2', name: 'Ступень 2' };
     }
-    // 4. Ступень 2 / Промежуточный уступ лестницы (105 см - 138 см)
-    if (lz <= 1.38) {
-      return { y: -1.35, tier: 'STEP_2', name: 'Ступень 2' };
-    }
-    // 5. Пол комнаты (дальше 138 см от афиши)
-    return { y: -1.68, tier: 'FLOOR', name: 'Пол' };
+    // 5. Пол комнаты (дальше 105 см от афиши)
+    return { y: -1.60, tier: 'FLOOR', name: 'Пол' };
   }
 
   // Гироскоп и пространственная привязка в комнате
@@ -603,14 +603,16 @@
         tmpVec.y += Math.sin(ep * Math.PI) * 0.40;
 
         if (opticalTargetDetected && dioramaGroup) {
+          dioramaGroup.updateMatrixWorld(true);
           dioramaGroup.localToWorld(tmpVec);
+          if (tmpVec.z > -0.25) tmpVec.z = -0.25;
           roomTornadoRoot.position.copy(tmpVec);
           lockedTornadoWorldPos.copy(tmpVec);
           lastSeenGyroYaw = currentGyroYaw;
           lastSeenGyroPitch = currentGyroPitch;
           hasLockedPosterRoomAnchor = true;
         } else {
-          roomTornadoRoot.position.set(0, -0.68, -1.25);
+          roomTornadoRoot.position.set(0, -0.62, -0.85);
         }
 
         tornadoGroup.position.set(0, 0, 0);
@@ -717,12 +719,22 @@
       // 3. Синхронизация с 3D-миром (камера / оптический трекер / гироскоп)
       const isAimed = window.checkAimAtPoster ? window.checkAimAtPoster() : false;
       const banner = document.getElementById('ar-warning-banner');
-      const badge = document.getElementById('ar-badge');
+      if (tornadoGroup) {
+        tornadoGroup.visible = true;
+        tornadoGroup.position.set(0, 0, 0);
+      }
+      if (roomTornadoRoot) {
+        roomTornadoRoot.visible = true;
+      }
 
       if (isAimed && dioramaGroup) {
-        // Камера видит афишу: ураган прочно зафиксирован на столе/полу перед афишей с параллаксом!
+        // Камера видит афишу: ураган прочно зафиксирован на столе перед афишей с параллаксом
         tmpVec.copy(tornadoSimPos);
+        dioramaGroup.updateMatrixWorld(true);
         dioramaGroup.localToWorld(tmpVec);
+
+        // Гарантируем, что ураган всегда находится в поле зрения перед камерой (Z < -0.22)
+        if (tmpVec.z > -0.25) tmpVec.z = -0.25;
 
         roomTornadoRoot.position.lerp(tmpVec, 0.28);
         lockedTornadoWorldPos.copy(roomTornadoRoot.position);
@@ -731,13 +743,6 @@
         hasLockedPosterRoomAnchor = true;
 
         if (banner && banner.style.display !== 'none') banner.style.display = 'none';
-        if (badge) {
-          const statusText = isTornadoAirborne
-            ? `⬇️ Падение на: ${targetSurface.name}...`
-            : `📍 Поверхность: ${targetSurface.name}`;
-          badge.textContent = `🎯 ${statusText} | Смахните в афишу!`;
-          badge.classList.add('detected');
-        }
       } else {
         // Камера отвернута в комнату: ураган держится в пространстве комнаты по гироскопу, НЕ липнет к экрану!
         if (hasLockedPosterRoomAnchor) {
@@ -748,6 +753,7 @@
 
           const gyroEuler = new THREE.Euler(-dPitch, -dYaw, 0, 'YXZ');
           const targetRoomPos = lockedTornadoWorldPos.clone().applyEuler(gyroEuler);
+          if (targetRoomPos.z > -0.25) targetRoomPos.z = -0.25;
 
           roomTornadoRoot.position.lerp(targetRoomPos, 0.22);
         }
@@ -755,13 +761,6 @@
         if (banner && banner.style.display === 'none') {
           banner.style.display = 'block';
           banner.textContent = '⚠️ АФИША ВНЕ КАДРА! НАВЕДИТЕ НА АФИШУ ДЛЯ УДАРА!';
-        }
-        if (badge) {
-          const statusText = isTornadoAirborne
-            ? `⬇️ Падение на: ${targetSurface.name}...`
-            : `📍 Поверхность: ${targetSurface.name}`;
-          badge.textContent = `🌪️ ${statusText} (ищите афишу)`;
-          badge.classList.remove('detected');
         }
       }
     }

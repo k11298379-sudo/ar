@@ -125,6 +125,7 @@
 
               if (dioramaGroup) {
                 dioramaGroup.matrix.copy(m);
+                dioramaGroup.matrixWorld.copy(m);
                 dioramaGroup.matrixAutoUpdate = false;
                 dioramaGroup.matrixWorldNeedsUpdate = true;
                 dioramaGroup.visible = true;

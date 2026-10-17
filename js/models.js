@@ -7,8 +7,8 @@
 
   // Константы позиционирования для MR
   const TORNADO_POSTER_POS   = new THREE.Vector3(0.06, -0.38, -0.80); // зарождается у домика Ведьмы в глубине портала
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.68, 0.55); // приземляется перед афишей на стол (+55см к пользователю)
-  const TORNADO_BASE_SCALE   = 0.44; // базовый масштаб вихря (~1.1м высота)
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.62, 0.16); // приземляется перед афишей на стол/клавиатуру (+16см к пользователю)
+  const TORNADO_BASE_SCALE   = 0.52; // базовый масштаб вихря (~1.3м высота)
 
   window.TORNADO_POSTER_POS   = TORNADO_POSTER_POS;
   window.TORNADO_ROOM_DEFAULT = TORNADO_ROOM_DEFAULT;
@@ -620,7 +620,7 @@
     tornadoGroup.name = "TornadoVortex";
     tornadoGroup.position.copy(TORNADO_POSTER_POS);
     tornadoGroup.scale.setScalar(0.04);
-    tornadoGroup.visible = false;
+    tornadoGroup.visible = true;
     if (parentGroup) parentGroup.add(tornadoGroup);
 
     tornadoRings = [];
@@ -649,14 +649,14 @@
       const light = 0.28 + t * 0.22;
       const sliceColor = new THREE.Color().setHSL(hue, sat, light);
 
-      // Полупрозрачный эфирный материал (не перекрывает экран наглухо)
+      // Материал вихря: плотные клубы бури с полупрозрачными краями
       const sliceMat = new THREE.MeshStandardMaterial({
         color: sliceColor,
-        roughness: 0.88,
-        metalness: 0.05,
+        roughness: 0.45,
+        metalness: 0.15,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: (0.28 - t * 0.08),
+        opacity: (0.76 - t * 0.18),
         depthWrite: false
       });
 
@@ -677,9 +677,9 @@
     const groundSwirlGeo = new THREE.CylinderGeometry(0.55, 0.18, 0.24, 24, 2, true);
     const groundSwirlMat = new THREE.MeshStandardMaterial({
       color: 0x786452,
-      roughness: 0.95,
+      roughness: 0.75,
       transparent: true,
-      opacity: 0.32,
+      opacity: 0.65,
       side: THREE.DoubleSide,
       depthWrite: false
     });
