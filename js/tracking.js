@@ -117,14 +117,30 @@
                 posterGroup.visible = true;
               }
 
+              const prompt = document.getElementById('ar-target-prompt');
+              if (prompt) prompt.style.display = 'none';
+
+              const banner = document.getElementById('ar-warning-banner');
+              if (banner) banner.style.display = 'none';
+
               if (window.tornadoState === 'WAITING_FOR_POSTER') {
                 triggerPosterEncounter();
               }
             } else {
+              // Афиша вышла из кадра!
               opticalTargetDetected = false;
               window.opticalTargetDetected = false;
-              if (window.tornadoState === 'WAITING_FOR_POSTER') {
+
+              // При реальной камере скрываем диораму афиши, так как афиши нет в поле зрения!
+              if (window.cameraActive && !window.fallbackModeActive) {
                 if (dioramaGroup) dioramaGroup.visible = false;
+                if (posterGroup) posterGroup.visible = false;
+
+                // Напоминаем навести камеру на афишу
+                if (window.tornadoState !== 'WAITING_FOR_POSTER') {
+                  const banner = document.getElementById('ar-warning-banner');
+                  if (banner) banner.style.display = 'block';
+                }
               }
             }
           }
@@ -159,12 +175,13 @@
 
   // Резервное позиционирование диорамы для виртуального режима (без камеры/афиши)
   function setupFallbackDioramaPose() {
+    window.fallbackModeActive = true;
     const dioramaGroup = window.dioramaGroup;
     const posterGroup = window.posterGroup;
     if (dioramaGroup) {
-      dioramaGroup.position.set(0, 0.08, -1.25);
+      dioramaGroup.position.set(0, 0.02, -1.85);
       dioramaGroup.rotation.set(-0.12, 0, 0);
-      dioramaGroup.scale.setScalar(1.0);
+      dioramaGroup.scale.setScalar(0.75);
       dioramaGroup.updateMatrix();
       dioramaGroup.matrixAutoUpdate = false;
       dioramaGroup.matrixWorldNeedsUpdate = true;
@@ -175,32 +192,33 @@
 
   // Проверка наведения смартфона на афишу
   function checkAimAtPoster() {
-    if (opticalTargetDetected === true) return true;
-
-    const tCamera = window.tCamera;
-    const camGyroPitch = window.camGyroPitch || 0;
-    const camGyroYaw = window.camGyroYaw || 0;
-
-    if (tCamera) {
-      const isPitchForward = (camGyroPitch > -0.32 && camGyroPitch < 0.28);
-      const isYawForward   = (Math.abs(camGyroYaw) < 0.42);
-      if (isPitchForward && isYawForward) {
-        return true;
-      }
+    // Если активна камера — проверяем строго факт оптического распознавания афиши
+    if (window.cameraActive && !window.fallbackModeActive) {
+      return opticalTargetDetected === true;
     }
-    return false;
+
+    // В виртуальном режиме без камеры — наведение по гироскопу
+    const isPitchForward = (camGyroPitch > -0.32 && camGyroPitch < 0.28);
+    const isYawForward   = (Math.abs(camGyroYaw) < 0.42);
+    return isPitchForward && isYawForward;
   }
 
   // Срабатывание встречи с афишей
-  function triggerPosterEncounter() {
+  function triggerPosterEncounter(force = false) {
     if (posterEncounterTriggered) return;
+
+    // В режиме реальной камеры запускаем ТОЛЬКО если афиша действительно обнаружена MindAR
+    if (window.cameraActive && !window.fallbackModeActive && !opticalTargetDetected && !force) {
+      return;
+    }
+
     posterEncounterTriggered = true;
     window.posterEncounterTriggered = true;
 
     const dioramaGroup = window.dioramaGroup;
     const posterGroup = window.posterGroup;
 
-    if (!opticalTargetDetected) {
+    if (!opticalTargetDetected || window.fallbackModeActive) {
       setupFallbackDioramaPose();
     }
     if (dioramaGroup) dioramaGroup.visible = true;

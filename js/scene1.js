@@ -319,16 +319,20 @@
     if (btnForcePoster) {
       btnForcePoster.addEventListener('click', (e) => {
         e.stopPropagation();
+        window.fallbackModeActive = true;
         if (window.getCtx) window.getCtx();
-        if (window.triggerPosterEncounter) window.triggerPosterEncounter();
+        if (window.setupFallbackDioramaPose) window.setupFallbackDioramaPose();
+        if (window.triggerPosterEncounter) window.triggerPosterEncounter(true);
       });
     }
 
     const arTargetPrompt = document.getElementById('ar-target-prompt');
     if (arTargetPrompt) {
       arTargetPrompt.addEventListener('click', () => {
+        window.fallbackModeActive = true;
         if (window.getCtx) window.getCtx();
-        if (window.triggerPosterEncounter) window.triggerPosterEncounter();
+        if (window.setupFallbackDioramaPose) window.setupFallbackDioramaPose();
+        if (window.triggerPosterEncounter) window.triggerPosterEncounter(true);
       });
     }
 
@@ -507,13 +511,20 @@
       }
     }
 
-    // Видимость диорамы
+    // Видимость диорамы:
+    // При реальной камере диорама видна ТОЛЬКО когда физическая афиша в поле зрения!
     const posterEncounterTriggered = window.posterEncounterTriggered;
     const opticalTargetDetected = window.opticalTargetDetected;
     if (dioramaGroup) {
-      if (posterEncounterTriggered || opticalTargetDetected || houseState === 'LAUNCHING' || houseState === 'LANDED') {
-        dioramaGroup.visible = true;
-        if (window.posterGroup) window.posterGroup.visible = true;
+      if (window.cameraActive && !window.fallbackModeActive) {
+        const isVisible = (opticalTargetDetected === true);
+        dioramaGroup.visible = isVisible;
+        if (window.posterGroup) window.posterGroup.visible = isVisible;
+      } else {
+        if (posterEncounterTriggered || opticalTargetDetected) {
+          dioramaGroup.visible = true;
+          if (window.posterGroup) window.posterGroup.visible = true;
+        }
       }
     }
 

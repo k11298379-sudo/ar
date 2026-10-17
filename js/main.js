@@ -201,6 +201,8 @@
       btnSkipHttps.addEventListener('click', () => {
         if (httpsModal) httpsModal.style.display = 'none';
         if (window.getCtx) window.getCtx();
+        window.fallbackModeActive = true;
+        if (window.setupFallbackDioramaPose) window.setupFallbackDioramaPose();
       });
     }
 
@@ -208,6 +210,8 @@
       btnMockMode.addEventListener('click', () => {
         if (cameraGate) cameraGate.style.display = 'none';
         if (window.getCtx) window.getCtx();
+        window.fallbackModeActive = true;
+        if (window.setupFallbackDioramaPose) window.setupFallbackDioramaPose();
       });
     }
 
