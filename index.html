@@ -858,17 +858,12 @@
   }
 
   function getSiteUrl() {
-    if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && !location.hostname.startsWith('192.168.')) {
-      return window.location.origin + window.location.pathname;
-    }
-    if (serverInfo && serverInfo.public_url) return serverInfo.public_url;
-    if (serverInfo && serverInfo.phone_url)  return serverInfo.phone_url;
     return 'https://k11298379-sudo.github.io/ar/';
   }
 
   function updatePhoneModalUrl(url) {
     if (!modalLink) return;
-    const finalUrl = url || getSiteUrl();
+    const finalUrl = 'https://k11298379-sudo.github.io/ar/';
     modalLink.textContent = finalUrl;
     modalLink.href = finalUrl;
 
@@ -879,9 +874,9 @@
           text: finalUrl,
           width: 160,
           height: 160,
-          colorDark: "#022416",
+          colorDark: "#000000",
           colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.M
+          correctLevel: QRCode.CorrectLevel.H
         });
         return;
       } catch (e) {
@@ -894,22 +889,7 @@
     }
   }
 
-  // Если открыто на настоящем сайте в интернете — сразу генерируем ссылку на этот сайт
-  if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && !location.hostname.startsWith('192.168.')) {
-    updatePhoneModalUrl(window.location.origin + window.location.pathname);
-  } else {
-    fetch('/api/info')
-      .then(r => r.json())
-      .then(d => {
-        if (d) {
-          serverInfo = d;
-          updatePhoneModalUrl(d.public_url || d.phone_url);
-        }
-      })
-      .catch(() => {
-        updatePhoneModalUrl(window.location.href);
-      });
-  }
+  updatePhoneModalUrl();
 
   if (btnPhone) {
     btnPhone.addEventListener('click', () => {

@@ -216,6 +216,14 @@
     #qrcode-canvas {
       width: clamp(80px, 14vw, 100px);
       height: clamp(80px, 14vw, 100px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #qrcode-canvas canvas,
+    #qrcode-canvas img {
+      width: 100% !important;
+      height: 100% !important;
       display: block;
     }
     .qr-badge-caption {
@@ -334,11 +342,11 @@
         try {
           new QRCode(qrContainer, {
             text: targetUrl,
-            width: 128,
-            height: 128,
-            colorDark: "#022416",
+            width: 140,
+            height: 140,
+            colorDark: "#000000",
             colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.M
+            correctLevel: QRCode.CorrectLevel.H
           });
           return;
         } catch (e) {
@@ -348,7 +356,7 @@
 
       // 2. Фолбэк на онлайн генератор
       const img = document.createElement('img');
-      img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(targetUrl)}`;
+      img.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(targetUrl)}`;
       img.style.width = '100%';
       img.style.height = '100%';
       img.alt = 'QR Code';
@@ -356,9 +364,7 @@
     }
 
     function getSiteUrl() {
-      if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && !location.hostname.startsWith('192.168.')) {
-        return window.location.origin + window.location.pathname.replace(/poster\.html$/i, '');
-      }
+      // ВСЕГДА ведём строго на рабочий сайт AR на GitHub Pages!
       return 'https://k11298379-sudo.github.io/ar/';
     }
 
