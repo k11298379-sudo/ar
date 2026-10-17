@@ -119,6 +119,38 @@
       }
     }
 
+    /* ── MR RECALL BUTTON (ВОЗВРАТ УРАГАНА ИЗ-ЗА СТЕНЫ) ── */
+    #mr-recall-btn {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 60;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.98));
+      border: 2px solid #a7f3d0;
+      color: #022c1b;
+      font-size: clamp(12.5px, 2.8vw, 15.5px);
+      font-weight: 800;
+      padding: 12px 24px;
+      border-radius: 28px;
+      cursor: pointer;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.8), 0 4px 15px rgba(0, 0, 0, 0.45);
+      animation: pulseRecallBtn 1.2s ease-in-out infinite;
+      touch-action: manipulation;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    #mr-recall-btn:active {
+      transform: translateX(-50%) scale(0.96);
+    }
+    @keyframes pulseRecallBtn {
+      0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.65), 0 4px 15px rgba(0,0,0,.4); }
+      50% { box-shadow: 0 0 35px rgba(52, 211, 153, 0.95), 0 4px 20px rgba(0,0,0,.6); }
+    }
+
     /* ══════════════════════════════════
        SCENE 2 & 3: 3D PAN WORLD
        ══════════════════════════════════ */
@@ -494,6 +526,11 @@
           ⚠️ НАВЕДИТЕСЬ КАМЕРОЙ НА АФИШУ!
         </div>
       </div>
+
+      <!-- КНОПКА ВОЗВРАТА УРАГАНА ИЗ-ЗА СТЕНЫ -->
+      <button id="mr-recall-btn" style="display:none;">
+        <span>🌪️</span> <span>Вернуть ураган в комнату ➔</span>
+      </button>
     </section>
 
     <!-- ═══════════ SCENE 2 & 3: 3D WORLD ═══════════ -->
@@ -570,6 +607,7 @@
   const arReticle      = $('ar-reticle');
   const arReticleStatus= $('ar-reticle-status');
   const arWarningBanner= $('ar-warning-banner');
+  const mrRecallBtn    = $('mr-recall-btn');
 
   // Scene 2/3
   const world      = $('world');
@@ -952,7 +990,7 @@
   let starSparkleData = [];
 
   // Textures
-  let woodPlankTexture, roofShingleTexture, stoneWallTexture, cloudAlphaTexture, posterTexture, witchRoofTexture, stripesTexture;
+  let woodPlankTexture, roofShingleTexture, stoneWallTexture, cloudAlphaTexture, posterTexture, witchRoofTexture, stripesTexture, floorAbrasionTexture;
 
   // Real AR State & Positions
   let swipeCount = 0;
@@ -964,8 +1002,27 @@
   let tornadoBlowVel     = new THREE.Vector3();
   let tornadoOpacity     = 1.0;
 
-  // Ураган вылетает из афиши в комнату
-  let tornadoState = 'ERUPTING'; // 'ERUPTING' | 'ROAMING'
+  // MR Floor & Room Wall System
+  let floorContactMesh = null;
+  let mrRoomGroup = null, mrDoorwayFrame = null, mrOccluderMeshes = [];
+  const ROOM_BOUNDS = {
+    left: -1.45,
+    right: 1.45,
+    back: -2.20,
+    front: 1.05,
+    doorZMin: -0.40,
+    doorZMax: 1.05,
+    doorX: 1.68
+  };
+  const BEYOND_WALL_POS = new THREE.Vector3(2.65, 0.0, 0.35);
+  const DOORWAY_POS     = new THREE.Vector3(1.68, 0.0, 0.35);
+  let beyondWallStartTime = 0;
+  let returnStartTime     = 0;
+  let flingStartPos       = new THREE.Vector3();
+  let returnStartPos      = new THREE.Vector3();
+
+  // Ураган в MR пространстве: ERUPTING | ROAMING | BEYOND_WALL | RETURNING
+  let tornadoState = 'ERUPTING';
   let eruptionStartTime = 0;
   const ERUPTION_DURATION = 1800;
   const TORNADO_POSTER_POS   = new THREE.Vector3(0, 1.40, -2.75);
@@ -1044,6 +1101,7 @@
     // 4. Procedural Textures & 3D Objects
     generateAllTextures();
     createPosterAndClearing();
+    createMRRoomSystem();
     createWitchCottage();
     createTornado();
     createHouse();
@@ -1243,6 +1301,54 @@
     }
     stripesTexture = new THREE.CanvasTexture(strC);
     stripesTexture.wrapS = stripesTexture.wrapT = THREE.RepeatWrapping;
+
+    // 8. Текстура контакта урагана с полом (MR Floor Abrasion & Vortex Scour)
+    const abrC = document.createElement('canvas');
+    abrC.width = 512; abrC.height = 512;
+    const aCtx = abrC.getContext('2d');
+
+    // Центр вихревого затенения пола (Ambient Occlusion & contact shadow)
+    const aGrad = aCtx.createRadialGradient(256, 256, 12, 256, 256, 245);
+    aGrad.addColorStop(0, 'rgba(18, 12, 8, 0.78)');
+    aGrad.addColorStop(0.25, 'rgba(32, 24, 16, 0.58)');
+    aGrad.addColorStop(0.55, 'rgba(50, 38, 26, 0.26)');
+    aGrad.addColorStop(0.82, 'rgba(70, 56, 40, 0.08)');
+    aGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    aCtx.fillStyle = aGrad;
+    aCtx.fillRect(0, 0, 512, 512);
+
+    // Спиральные борозды истирания пола от вращения вихря
+    aCtx.lineWidth = 3.2;
+    aCtx.strokeStyle = 'rgba(24, 16, 10, 0.42)';
+    for (let s = 0; s < 36; s++) {
+      const a0 = (s / 36) * Math.PI * 2;
+      aCtx.beginPath();
+      for (let r = 20; r < 235; r += 6) {
+        const a = a0 + (r * 0.024);
+        const x = 256 + Math.cos(a) * r;
+        const y = 256 + Math.sin(a) * r;
+        if (r === 20) aCtx.moveTo(x, y);
+        else aCtx.lineTo(x, y);
+      }
+      aCtx.stroke();
+    }
+
+    // Круговые полосы закручиваемой пыли по поверхности пола
+    aCtx.lineWidth = 2.4;
+    aCtx.strokeStyle = 'rgba(241, 245, 249, 0.32)';
+    for (let s = 0; s < 20; s++) {
+      const a0 = (s / 20) * Math.PI * 2 + 0.12;
+      aCtx.beginPath();
+      for (let r = 45; r < 215; r += 8) {
+        const a = a0 + (r * 0.030);
+        const x = 256 + Math.cos(a) * r;
+        const y = 256 + Math.sin(a) * r;
+        if (r === 45) aCtx.moveTo(x, y);
+        else aCtx.lineTo(x, y);
+      }
+      aCtx.stroke();
+    }
+    floorAbrasionTexture = new THREE.CanvasTexture(abrC);
   }
 
   // ─── POSTER BASE & ENCHANTED CLEARING ─────────────────
@@ -1462,7 +1568,7 @@
       });
 
       const sliceMesh = new THREE.Mesh(sliceGeo, sliceMat);
-      sliceMesh.position.y = 0.15 + t * maxHeight;
+      sliceMesh.position.y = 0.04 + t * maxHeight;
       sliceMesh.rotation.y = i * 0.55;
       sliceMesh.userData = {
         t: t,
@@ -1474,8 +1580,8 @@
       tornadoRings.push(sliceMesh);
     }
 
-    // Приземный пылевой буран
-    const groundSwirlGeo = new THREE.CylinderGeometry(1.65, 0.45, 0.75, 24, 2, true);
+    // Приземный пылевой буран (касается пола)
+    const groundSwirlGeo = new THREE.CylinderGeometry(1.65, 0.45, 0.65, 24, 2, true);
     const groundSwirlMat = new THREE.MeshStandardMaterial({
       color: 0x786452,
       roughness: 0.95,
@@ -1485,8 +1591,21 @@
       depthWrite: false
     });
     groundSwirlMesh = new THREE.Mesh(groundSwirlGeo, groundSwirlMat);
-    groundSwirlMesh.position.y = 0.38;
+    groundSwirlMesh.position.y = 0.32;
     tornadoGroup.add(groundSwirlMesh);
+
+    // Абразивный диск контакта с реальным полом комнаты (MR Floor Abrasion Contact Decal)
+    const floorContactGeo = new THREE.PlaneGeometry(2.35, 2.35);
+    floorContactGeo.rotateX(-Math.PI / 2);
+    const floorContactMat = new THREE.MeshBasicMaterial({
+      map: floorAbrasionTexture,
+      transparent: true,
+      opacity: 0.88,
+      depthWrite: false
+    });
+    floorContactMesh = new THREE.Mesh(floorContactGeo, floorContactMat);
+    floorContactMesh.position.set(tornadoGroup.position.x, 0.005, tornadoGroup.position.z);
+    dioramaGroup.add(floorContactMesh);
 
     // 1200 объёмных частиц пыли и облаков
     const pCount = 1200;
@@ -1500,9 +1619,9 @@
       const t = Math.random();
       const angle = Math.random() * Math.PI * 2;
       const isBaseDust = i < 280;
-      const h = isBaseDust ? Math.random() * 0.18 : t;
+      const h = isBaseDust ? Math.random() * 0.12 : t;
       const radiusSpread = isBaseDust
-        ? (0.35 + Math.random() * 1.45)
+        ? (0.40 + Math.random() * 1.55)
         : (0.24 + Math.pow(h, 1.55) * 2.05) * (0.82 + Math.random() * 0.45);
 
       vortexParticleData.push({
@@ -1763,6 +1882,161 @@
     if (clearingGroup) clearingGroup.add(starSparklesPoints);
   }
 
+  // ─── MR ROOM OCCLUSION & DOORWAY SYSTEM ───────────────
+  function createMRRoomSystem() {
+    mrRoomGroup = new THREE.Group();
+    mrRoomGroup.name = "MR_Room_Wall_Occluders";
+
+    // Материал невидимого MR-окклюдера:
+    // depthWrite: true записывает 3D-геометрию стен в depth buffer
+    // colorWrite: false не рисует пикселей (canvas остается 100% прозрачным над камерой)
+    // Благодаря этому реальные стены комнаты из видеокамеры честно скрывают ураган, когда он за стеной!
+    const occluderMat = new THREE.MeshBasicMaterial({
+      colorWrite: false,
+      depthWrite: true
+    });
+
+    mrOccluderMeshes = [];
+
+    function addOccluderBox(geo, pos) {
+      const m = new THREE.Mesh(geo, occluderMat);
+      m.position.copy(pos);
+      m.renderOrder = -10; // Первым рендерится в depth buffer
+      mrRoomGroup.add(m);
+      mrOccluderMeshes.push(m);
+      return m;
+    }
+
+    // 1. Левая глухая стена комнаты (X = -1.72)
+    addOccluderBox(new THREE.BoxGeometry(0.12, 4.5, 6.0), new THREE.Vector3(-1.72, 2.0, -0.6));
+
+    // 2. Задняя стена комнаты за афишей (Z = -2.85)
+    addOccluderBox(new THREE.BoxGeometry(6.0, 4.5, 0.12), new THREE.Vector3(0, 2.0, -2.85));
+
+    // 3. Передняя стена комнаты перед зрителем (Z = 1.65)
+    addOccluderBox(new THREE.BoxGeometry(6.0, 4.5, 0.12), new THREE.Vector3(0, 2.0, 1.65));
+
+    // 4. Правая стена комнаты с открытым сказочным дверным проемом:
+    // Дверной проем по Z от -0.40 до +1.05 (ширина 1.45м, высота 2.50м)
+    // а) Задний глухой сегмент правой стены (от Z=-3.0 до Z=-0.40)
+    addOccluderBox(new THREE.BoxGeometry(0.12, 4.5, 2.5), new THREE.Vector3(1.72, 2.0, -1.65));
+    // б) Передний глухой сегмент правой стены (от Z=+1.05 до Z=+1.90)
+    addOccluderBox(new THREE.BoxGeometry(0.12, 4.5, 1.1), new THREE.Vector3(1.72, 2.0, 1.55));
+    // в) Перемычка стены над дверным проемом (от Y=2.50 до Y=4.5)
+    addOccluderBox(new THREE.BoxGeometry(0.12, 1.8, 1.55), new THREE.Vector3(1.72, 3.4, 0.325));
+
+    // 5. Сказочное портальное обрамление дверного проема ("За стену")
+    mrDoorwayFrame = new THREE.Group();
+    mrDoorwayFrame.name = "MR_Doorway_Frame";
+    mrDoorwayFrame.position.set(1.68, 0, 0.325);
+
+    const pillarMat = new THREE.MeshStandardMaterial({
+      color: 0x059669,
+      roughness: 0.35,
+      metalness: 0.75,
+      emissive: 0x064e3b,
+      emissiveIntensity: 0.35
+    });
+    const goldTrimMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      roughness: 0.3,
+      metalness: 0.85
+    });
+
+    const pillarGeo = new THREE.CylinderGeometry(0.055, 0.075, 2.5, 12);
+    // Левая стойка проема
+    const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
+    leftPillar.position.set(0, 1.25, -0.72);
+    mrDoorwayFrame.add(leftPillar);
+
+    // Правая стойка проема
+    const rightPillar = new THREE.Mesh(pillarGeo, pillarMat);
+    rightPillar.position.set(0, 1.25, 0.72);
+    mrDoorwayFrame.add(rightPillar);
+
+    // Золотые базы и капители стоек
+    [-0.72, 0.72].forEach(pz => {
+      const baseMesh = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.18), goldTrimMat);
+      baseMesh.position.set(0, 0.07, pz);
+      mrDoorwayFrame.add(baseMesh);
+
+      const capMesh = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.18), goldTrimMat);
+      capMesh.position.set(0, 2.45, pz);
+      mrDoorwayFrame.add(capMesh);
+    });
+
+    // Верхняя балка-арка портала
+    const archBeam = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.18, 1.62), goldTrimMat);
+    archBeam.position.set(0, 2.52, 0);
+    mrDoorwayFrame.add(archBeam);
+
+    // Светящийся порог на полу
+    const threshGeo = new THREE.PlaneGeometry(0.24, 1.48);
+    threshGeo.rotateX(-Math.PI / 2);
+    const threshMat = new THREE.MeshBasicMaterial({
+      color: 0x34d399,
+      transparent: true,
+      opacity: 0.65
+    });
+    const thresholdMesh = new THREE.Mesh(threshGeo, threshMat);
+    thresholdMesh.position.set(0, 0.006, 0);
+    mrDoorwayFrame.add(thresholdMesh);
+
+    // Источник изумрудного света в проеме
+    const portalLight = new THREE.PointLight(0x34d399, 1.3, 4.5);
+    portalLight.position.set(-0.1, 1.4, 0);
+    mrDoorwayFrame.add(portalLight);
+
+    mrRoomGroup.add(mrDoorwayFrame);
+    dioramaGroup.add(mrRoomGroup);
+  }
+
+  // Эффект удара урагана о стены комнаты (звук + выброс пыли)
+  function triggerWallImpact(x, y, z, nx, nz) {
+    sfx.snap();
+    const impactPos = new THREE.Vector3(x, y, z);
+    for (let idx = 0; idx < Math.min(8, dustBurstPuffs.length); idx++) {
+      const p = dustBurstPuffs[idx];
+      const spread = (Math.random() - 0.5) * 0.7;
+      p.position.copy(impactPos).add(new THREE.Vector3(nx * 0.08, spread, nz * 0.08));
+      p.userData.vel.set(
+        (nx * 1.5) + (Math.random() - 0.5) * 0.8,
+        0.35 + Math.random() * 0.7,
+        (nz * 1.5) + (Math.random() - 0.5) * 0.8
+      );
+      p.userData.life = 0.001;
+      p.userData.maxLife = 0.45 + Math.random() * 0.2;
+      p.scale.setScalar(0.45 + Math.random() * 0.4);
+      p.material.opacity = 0.75;
+      p.visible = true;
+    }
+  }
+
+  // Смахивание урагана за стену в дверной проем
+  function flingTornadoBeyondWall() {
+    if (tornadoState === 'BEYOND_WALL' || tornadoState === 'RETURNING') return;
+    tornadoState = 'BEYOND_WALL';
+    beyondWallStartTime = performance.now();
+    flingStartPos.copy(tornadoGroup.position);
+    sfx.whoosh();
+    sfx.chime();
+
+    if (mrRecallBtn) mrRecallBtn.style.display = 'flex';
+  }
+
+  // Возврат урагана обратно в комнату
+  function returnTornadoToRoom() {
+    if (tornadoState !== 'BEYOND_WALL') return;
+    tornadoState = 'RETURNING';
+    returnStartTime = performance.now();
+    returnStartPos.copy(tornadoGroup.position);
+    sfx.whoosh();
+    sfx.snap();
+    doFlash('rgba(52, 211, 153, 0.45)', 200);
+
+    if (mrRecallBtn) mrRecallBtn.style.display = 'none';
+  }
+
   // ─── SWIPE TRAIL & INTERACTION EVENTS ────────────────
   // ─── GYROSCOPE & AIMING DETECTION ────────────────────
   function initGyroscope() {
@@ -1930,25 +2204,59 @@
         if (S.scene === 1 && houseState === 'ORBITING') handleSwipeGesture(0, -60);
       });
     }
+
+    // Кнопка возврата урагана из-за стены
+    if (mrRecallBtn) {
+      mrRecallBtn.addEventListener('click', () => {
+        returnTornadoToRoom();
+      });
+    }
   }
 
-  // ─── 2-SWIPE AR MECHANIC ──────────────────────────────
+  // ─── 2-SWIPE AR MECHANIC & MR ROOM FLING ─────────────
   function handleSwipeGesture(dx, dy) {
     if (houseState !== 'ORBITING') return;
+
+    // Если ураган сейчас за стеной:
+    if (tornadoState === 'BEYOND_WALL') {
+      // Свайп влево (тянем обратно в комнату) возвращает ураган
+      if (dx < -25) {
+        returnTornadoToRoom();
+      }
+      return;
+    }
 
     // Проверяем, наведена ли камера на афишу
     const aimed = checkAimAtPoster();
 
     if (!aimed) {
-      // Пользователь смахнул, когда НЕ наведен на афишу:
-      // Ураган физически толкается по комнате в направлении свайпа
-      const pushX = THREE.MathUtils.clamp((dx / window.innerWidth) * 3.5, -1.8, 1.8);
-      const pushZ = THREE.MathUtils.clamp((dy / window.innerHeight) * 3.5, -1.8, 1.8);
-      tornadoVel.x += pushX;
-      tornadoVel.z += pushZ;
+      // Пользователь смахнул, когда НЕ наведен на афишу (осматривает комнату):
+      // Если жест направлен сильно вправо (к проему в правой стене X = 1.68)
+      if (dx > 70) {
+        // Сильный бросок вправо — если ураган уже на правой половине, сразу летит за стену!
+        if (tornadoGroup.position.x > 0.35) {
+          flingTornadoBeyondWall();
+          return;
+        } else {
+          tornadoVel.x += 4.5;
+          tornadoVel.z += (dy / window.innerHeight) * 2.2;
+          sfx.whoosh();
+        }
+      } else if (dx < -70) {
+        tornadoVel.x -= 3.8;
+        tornadoVel.z += (dy / window.innerHeight) * 2.2;
+        sfx.whoosh();
+      } else {
+        // Ураган физически толкается по полу комнаты в направлении свайпа
+        const pushX = THREE.MathUtils.clamp((dx / window.innerWidth) * 4.2, -2.8, 2.8);
+        const pushZ = THREE.MathUtils.clamp((dy / window.innerHeight) * 4.2, -2.8, 2.8);
+        tornadoVel.x += pushX;
+        tornadoVel.z += pushZ;
+        sfx.whoosh();
+      }
+
       tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.95;
       tornadoTiltTarget.x = (dy / window.innerHeight) * 0.95;
-      sfx.whoosh();
 
       // Моргающая надпись с предупреждением!
       if (arWarningBanner) {
@@ -2073,44 +2381,117 @@
         tornadoGroup.scale.setScalar(1.0);
       }
     } else if (tornadoState === 'ROAMING' && !tornadoBlowAway) {
-      // Ураган парит и медленно перемещается по комнате
+      // 1. Движение урагана по полу комнаты
       tornadoVel.x += Math.sin(elapsed * 1.5) * 0.008;
       tornadoVel.z += Math.cos(elapsed * 1.2) * 0.008;
       tornadoGroup.position.x += tornadoVel.x * dt;
       tornadoGroup.position.z += tornadoVel.z * dt;
       tornadoVel.multiplyScalar(0.91);
 
-      // Проверяем экранные координаты центра урагана в камере смартфона (NDC от -1 до +1)
+      // Мягкий экранный бампер (не дает урагану исчезнуть из видимости камеры)
       if (tCamera) {
         const sp = tornadoGroup.position.clone().project(tCamera);
-
-        // Мягкий бампер от краев экрана: ураган плавно отскакивает и НИКОГДА не вылетает за экран!
-        if (sp.x > 0.50) {
-          tornadoVel.x = -Math.abs(tornadoVel.x) * 0.65 - 0.25;
-          tornadoGroup.position.x -= 0.035;
-        } else if (sp.x < -0.50) {
-          tornadoVel.x = Math.abs(tornadoVel.x) * 0.65 + 0.25;
-          tornadoGroup.position.x += 0.035;
+        if (sp.x > 0.82) {
+          tornadoVel.x = -Math.abs(tornadoVel.x) * 0.6 - 0.2;
+        } else if (sp.x < -0.82) {
+          tornadoVel.x = Math.abs(tornadoVel.x) * 0.6 + 0.2;
         }
-
-        if (sp.y > 0.40) {
-          tornadoVel.z = Math.abs(tornadoVel.z) * 0.65 + 0.25;
-          tornadoGroup.position.z += 0.035;
-        } else if (sp.y < -0.65) {
-          tornadoVel.z = -Math.abs(tornadoVel.z) * 0.65 - 0.25;
-          tornadoGroup.position.z -= 0.035;
+        if (sp.y > 0.75) {
+          tornadoVel.z = Math.abs(tornadoVel.z) * 0.6 + 0.2;
+        } else if (sp.y < -0.75) {
+          tornadoVel.z = -Math.abs(tornadoVel.z) * 0.6 - 0.2;
         }
       }
 
-      // Строгие физические границы видимой зоны комнаты
-      tornadoGroup.position.x = THREE.MathUtils.clamp(tornadoGroup.position.x, -0.65, 0.65);
-      tornadoGroup.position.z = THREE.MathUtils.clamp(tornadoGroup.position.z, -0.25, 1.05);
+      // ── СТЕНЫ КОМНАТЫ И ДВЕРНОЙ ПРОЕМ (MR ROOM BOUNDARIES & COLLISIONS) ──
+      // 1. Левая глухая стена (X = ROOM_BOUNDS.left = -1.45)
+      if (tornadoGroup.position.x < ROOM_BOUNDS.left) {
+        tornadoGroup.position.x = ROOM_BOUNDS.left;
+        tornadoVel.x = Math.abs(tornadoVel.x) * 0.72 + 0.55;
+        tornadoTiltTarget.z = -0.65;
+        triggerWallImpact(ROOM_BOUNDS.left - 0.05, 0.75, tornadoGroup.position.z, 1, 0);
+      }
+
+      // 2. Задняя стена перед афишей (Z = ROOM_BOUNDS.back = -2.20)
+      if (tornadoGroup.position.z < ROOM_BOUNDS.back) {
+        tornadoGroup.position.z = ROOM_BOUNDS.back;
+        tornadoVel.z = Math.abs(tornadoVel.z) * 0.72 + 0.55;
+        tornadoTiltTarget.x = 0.65;
+        triggerWallImpact(tornadoGroup.position.x, 0.75, ROOM_BOUNDS.back - 0.05, 0, 1);
+      }
+
+      // 3. Передняя стена перед зрителем (Z = ROOM_BOUNDS.front = 1.05)
+      if (tornadoGroup.position.z > ROOM_BOUNDS.front) {
+        tornadoGroup.position.z = ROOM_BOUNDS.front;
+        tornadoVel.z = -Math.abs(tornadoVel.z) * 0.72 - 0.55;
+        tornadoTiltTarget.x = -0.65;
+        triggerWallImpact(tornadoGroup.position.x, 0.75, ROOM_BOUNDS.front + 0.05, 0, -1);
+      }
+
+      // 4. Правая стена (X = ROOM_BOUNDS.right = 1.45): дверной проем ("за стену") vs глухая стена
+      const inDoorZ = (tornadoGroup.position.z >= ROOM_BOUNDS.doorZMin && tornadoGroup.position.z <= ROOM_BOUNDS.doorZMax);
+      if (inDoorZ) {
+        // Напротив дверного проема: если ураган двигается вправо за порог — улетает за стену!
+        if (tornadoGroup.position.x >= ROOM_BOUNDS.right - 0.02) {
+          flingTornadoBeyondWall();
+        }
+      } else {
+        // Глухая правая стена — упругий отскок с облаком пыли!
+        if (tornadoGroup.position.x > ROOM_BOUNDS.right) {
+          tornadoGroup.position.x = ROOM_BOUNDS.right;
+          tornadoVel.x = -Math.abs(tornadoVel.x) * 0.72 - 0.55;
+          tornadoTiltTarget.z = 0.65;
+          triggerWallImpact(ROOM_BOUNDS.right + 0.05, 0.75, tornadoGroup.position.z, -1, 0);
+        }
+      }
+
+      // Нижняя часть урагана СТРОГО на полу:
       tornadoGroup.position.y = 0.0;
 
       // Проверка прицеливания на афишу в реальном времени
       isAimedAtPoster = checkAimAtPoster();
       if (isAimedAtPoster && arWarningBanner && arWarningBanner.style.display !== 'none') {
         arWarningBanner.style.display = 'none';
+      }
+
+    } else if (tornadoState === 'BEYOND_WALL' && !tornadoBlowAway) {
+      // ── УРАГАН ЗА СТЕНОЙ (MR OCCLUSION STATE) ──
+      const ep = Math.min(1.0, (time - beyondWallStartTime) / 850);
+      const ease = 1 - Math.pow(1 - ep, 3);
+      tornadoGroup.position.lerpVectors(flingStartPos, BEYOND_WALL_POS, ease);
+      tornadoGroup.position.y = 0.0;
+
+      if (ep >= 1.0) {
+        // Легкое покачивание вихря за стеной в коридоре
+        tornadoGroup.position.x = BEYOND_WALL_POS.x + Math.sin(elapsed * 2.2) * 0.12;
+        tornadoGroup.position.z = BEYOND_WALL_POS.z + Math.cos(elapsed * 1.8) * 0.15;
+        tornadoGroup.position.y = 0.0;
+      }
+
+      // Автоматический возврат урагана в комнату через 5.5 секунд
+      if (time - beyondWallStartTime > 5500) {
+        returnTornadoToRoom();
+      }
+
+    } else if (tornadoState === 'RETURNING' && !tornadoBlowAway) {
+      // ── ВОЗВРАТ УРАГАНА ИЗ-ЗА СТЕНЫ ЧЕРЕЗ ПРОЕМ В ЦЕНТР КОМНАТЫ ──
+      const ep = Math.min(1.0, (time - returnStartTime) / 1150);
+      const ease = 1 - Math.pow(1 - ep, 3);
+
+      if (ep < 0.45) {
+        const p1 = ep / 0.45;
+        tornadoGroup.position.lerpVectors(returnStartPos, DOORWAY_POS, 1 - Math.pow(1 - p1, 2));
+      } else {
+        const p2 = (ep - 0.45) / 0.55;
+        tornadoGroup.position.lerpVectors(DOORWAY_POS, TORNADO_ROOM_DEFAULT, 1 - Math.pow(1 - p2, 2));
+      }
+      tornadoGroup.position.y = 0.0;
+
+      if (ep >= 1.0) {
+        tornadoState = 'ROAMING';
+        tornadoGroup.position.copy(TORNADO_ROOM_DEFAULT);
+        tornadoVel.set(-0.75, 0, 0);
+        triggerDustBurst(TORNADO_ROOM_DEFAULT);
       }
     }
 
@@ -2125,9 +2506,20 @@
       tornadoRings.forEach(r => { r.material.opacity = tornadoOpacity * 0.6; });
       if (groundSwirlMesh) groundSwirlMesh.material.opacity = tornadoOpacity * 0.45;
       if (vortexParticles) vortexParticles.material.opacity = tornadoOpacity * 0.55;
+      if (floorContactMesh) floorContactMesh.material.opacity = tornadoOpacity * 0.85;
     } else {
       tornadoGroup.rotation.z = tornadoTiltCurrent.z;
       tornadoGroup.rotation.x = tornadoTiltCurrent.x;
+    }
+
+    // Абразивный диск контакта с полом комнаты
+    if (floorContactMesh) {
+      floorContactMesh.position.set(tornadoGroup.position.x, 0.005, tornadoGroup.position.z);
+      floorContactMesh.rotation.y += spinRate * 2.0;
+      floorContactMesh.scale.setScalar(tornadoGroup.scale.x * (0.96 + Math.sin(elapsed * 5.0) * 0.05));
+      if (!tornadoBlowAway) {
+        floorContactMesh.material.opacity = tornadoOpacity * (tornadoState === 'BEYOND_WALL' ? 0.65 : 0.88);
+      }
     }
 
     if (vortexLight) {
