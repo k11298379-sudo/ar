@@ -152,17 +152,20 @@
               }
             } else {
               // Афиша потеряна из кадра — сглаживаем микро-потери кадра (буфер 350мс)
-              if (performance.now() - opticalLastSeenTime > 350) {
+              if (performance.now() - opticalLastSeenTime > 1500) {
                 opticalTargetDetected = false;
                 window.opticalTargetDetected = false;
 
-                if (dioramaGroup) dioramaGroup.visible = false;
-                if (posterGroup) posterGroup.visible = false;
+                // Скрываем диораму ТОЛЬКО если сцена еще не началась (ждем наведения на афишу)
+                if (window.tornadoState === 'WAITING_FOR_POSTER') {
+                  if (dioramaGroup) dioramaGroup.visible = false;
+                  if (posterGroup) posterGroup.visible = false;
+                }
 
                 const badge = document.getElementById('ar-badge');
                 if (badge) {
                   badge.textContent = window.tornadoState !== 'WAITING_FOR_POSTER'
-                    ? '🌪️ Ураган в комнате! Ищите афишу...'
+                    ? '🌪️ Наведите камеру на афишу для удара!'
                     : '🔍 Наведите на афишу целиком';
                   badge.classList.remove('detected');
                 }
@@ -172,7 +175,7 @@
                   const banner = document.getElementById('ar-warning-banner');
                   if (banner) {
                     banner.style.display = 'block';
-                    banner.textContent = '⚠️ АФИША ВНЕ КАДРА! НАВЕДИТЕ НА АФИШУ ДЛЯ УДАРА!';
+                    banner.textContent = '⚠️ НАВЕДИТЕ КАМЕРУ НА АФИШУ ДЛЯ УДАРА!';
                   }
                 }
               }
@@ -220,7 +223,7 @@
 
   // Проверка наведения смартфона на афишу (строго по оптическому трекингу)
   function checkAimAtPoster() {
-    return opticalTargetDetected === true;
+    return opticalTargetDetected === true || (performance.now() - opticalLastSeenTime < 3500);
   }
 
   // Срабатывание встречи с афишей

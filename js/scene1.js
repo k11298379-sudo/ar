@@ -242,6 +242,9 @@
     tornadoState = 'ERUPTING';
     window.tornadoState = tornadoState;
     eruptionStartTime = performance.now();
+    tornadoBlowAway = false;
+    tornadoOpacity = 1.0;
+    swipeCount = 0;
 
     const roomTornadoRoot = window.roomTornadoRoot;
     if (roomTornadoRoot) roomTornadoRoot.visible = true;
@@ -509,11 +512,17 @@
     // Диорама (поле, дом ведьмы, портал) видна ТОЛЬКО когда физическая афиша оптически обнаружена MindAR в данный момент!
     const nowMs = performance.now();
     const lastSeenTime = window.opticalLastSeenTime || 0;
-    const isTargetVisible = (window.opticalTargetDetected === true) && (nowMs - lastSeenTime < 250);
+    const isTargetActivelyTracked = (window.opticalTargetDetected === true) && (nowMs - lastSeenTime < 2000);
 
+    // До первого распознавания афиши диорама скрыта.
+    // Как только ураган вырвался, диорама и ураган остаются стабильно видимыми!
     if (dioramaGroup) {
-      dioramaGroup.visible = isTargetVisible;
-      if (window.posterGroup) window.posterGroup.visible = isTargetVisible;
+      if (tornadoState === 'WAITING_FOR_POSTER') {
+        dioramaGroup.visible = isTargetActivelyTracked;
+      } else {
+        dioramaGroup.visible = true;
+      }
+      if (window.posterGroup) window.posterGroup.visible = dioramaGroup.visible;
     }
 
     const roomTornadoRoot = window.roomTornadoRoot;
@@ -536,7 +545,7 @@
       if (dioramaGroup && tornadoGroup.parent !== dioramaGroup) {
         dioramaGroup.add(tornadoGroup);
       }
-      tornadoGroup.visible = (tornadoState !== 'WAITING_FOR_POSTER') && isTargetVisible;
+      tornadoGroup.visible = (tornadoState !== 'WAITING_FOR_POSTER');
     }
 
     // 1. Появление и движение урагана
@@ -624,17 +633,17 @@
         dioramaGroup.add(tornadoGroup);
       }
       tornadoGroup.position.copy(tornadoSimPos);
-      tornadoGroup.visible = isTargetVisible;
+      tornadoGroup.visible = true;
 
       if (floorContactMesh) {
-        floorContactMesh.visible = isTargetVisible;
+        floorContactMesh.visible = true;
         floorContactMesh.position.set(0, 0.005, 0);
         floorContactMesh.material.opacity = THREE.MathUtils.lerp(floorContactMesh.material.opacity, 0.88, dt * 10.0);
       }
 
       // 3. Информационный баннер
       const banner = document.getElementById('ar-warning-banner');
-      if (isTargetVisible) {
+      if (isTargetActivelyTracked) {
         if (banner && banner.style.display !== 'none') banner.style.display = 'none';
       } else {
         if (banner && banner.style.display === 'none') {
