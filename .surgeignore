@@ -1,9 +1,0 @@
-.git
-.gitignore
-*.pem
-*.key
-*.bat
-server.py
-*.zip
-__pycache__
-README.md
