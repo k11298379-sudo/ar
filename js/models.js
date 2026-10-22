@@ -1044,7 +1044,7 @@
     }
 
     const ndcX = (clientX / window.innerWidth) * 2 - 1;
-    if (window.tornadoVel) window.tornadoVel.x += ndcX * 2.8;
+    if (window.tornadoTiltTarget) window.tornadoTiltTarget.z = -ndcX * 0.45;
     window.tornadoSquashTarget = 0.82;
     if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
   }

@@ -36,24 +36,7 @@
   let isTornadoAirborne = false;
 
   function getRoomSurfaceElevation(lx, lz) {
-    // 1. Падение с бокового края стола (влево/вправо более 48 см) — на пол комнаты
-    if (Math.abs(lx) > 0.48) {
-      return { y: -1.45, tier: 'FLOOR', name: 'Пол' };
-    }
-    // 2. Поверхность стола перед афишей (глубина стола до 42 см от афиши)
-    if (lz <= 0.42) {
-      return { y: -0.62, tier: 'TABLE', name: 'Стол' };
-    }
-    // 3. Ступень 1 / Стул перед столом (42 см - 75 см)
-    if (lz <= 0.75) {
-      return { y: -0.98, tier: 'STEP_1', name: 'Ступень 1' };
-    }
-    // 4. Ступень 2 / Промежуточный уступ лестницы (75 см - 105 см)
-    if (lz <= 1.05) {
-      return { y: -1.30, tier: 'STEP_2', name: 'Ступень 2' };
-    }
-    // 5. Пол комнаты (дальше 105 см от афиши)
-    return { y: -1.60, tier: 'FLOOR', name: 'Пол' };
+    return { y: -0.62, tier: 'ROAD', name: 'Дорога' };
   }
 
   // Гироскоп и пространственная привязка в комнате
@@ -389,14 +372,8 @@
     const aimed = window.checkAimAtPoster ? window.checkAimAtPoster() : true;
 
     if (!aimed) {
-      // Свободный смах по комнате: смах вверх толкает вперед к краю стола и на пол
-      const pushX = THREE.MathUtils.clamp((dx / window.innerWidth) * 4.8, -3.5, 3.5);
-      const pushZ = THREE.MathUtils.clamp((dy / window.innerHeight) * 4.8, -3.5, 3.5);
-      tornadoVel.x += pushX;
-      tornadoVel.z -= pushZ;
-
-      tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.95;
-      tornadoTiltTarget.x = (dy / window.innerHeight) * 0.95;
+      tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.45;
+      tornadoTiltTarget.x = (dy / window.innerHeight) * 0.35;
       if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
 
       if (arWarningBanner) {
@@ -409,7 +386,6 @@
       return;
     }
 
-    // Камера наведена на афишу — результативный свайп
     if (arWarningBanner) arWarningBanner.style.display = 'none';
     swipeCount++;
     if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
@@ -419,7 +395,6 @@
       tornadoTiltTarget.z = -(dx >= 0 ? 1 : -1) * 0.65;
       tornadoTiltTarget.x = 0.45;
       tornadoSpeedMult = 0.75;
-      tornadoVel.z -= 3.0;
       if (window.sfx && window.sfx.snap) window.sfx.snap();
       if (window.doFlash) window.doFlash('rgba(0, 255, 162, 0.45)', 180);
       if (swipeHintText) swipeHintText.textContent = '⚡ 1-й свайп! Ураган слабеет! Ещё один свайп на афишу!';
@@ -438,24 +413,10 @@
     if (window.S.scene !== 1 || houseState !== 'ORBITING' || tornadoState !== 'ROAMING') return;
     const swipeHintText = document.getElementById('swipe-hint-text');
 
-    if (yRatio > 0.65) {
-      // Тап в нижнюю треть экрана (зона пола комнаты) — направляем ураган вперед через край стола на пол
-      tornadoVel.z += 2.8;
-      tornadoVel.x += ((clientX / window.innerWidth) - 0.5) * 2.5;
-      if (swipeHintText) swipeHintText.textContent = '⬇️ Ураган устремляется к краю стола и на пол!';
-    } else if (yRatio < 0.38) {
-      // Тап в верхнюю треть экрана (зона стола перед афишей) — возвращаем на стол
-      tornadoVel.z -= 2.8;
-      tornadoVel.x += ((clientX / window.innerWidth) - 0.5) * 2.5;
-      if (swipeHintText) swipeHintText.textContent = '⬆️ Восходящий поток поднимает ураган на стол!';
-    } else {
-      // Тап в центр — движение по ступеням
-      tornadoVel.z += (tornadoSimPos.z < 0.85 ? 1.8 : -1.8);
-      if (swipeHintText) swipeHintText.textContent = '🌀 Ураган перемещается по ступеням!';
-    }
-
-    tornadoTiltTarget.z = -(clientX / window.innerWidth - 0.5) * 0.7;
-    window.tornadoSquashTarget = 0.75;
+    tornadoTiltTarget.z = -(clientX / window.innerWidth - 0.5) * 0.45;
+    tornadoTiltTarget.x = (yRatio - 0.5) * 0.3;
+    window.tornadoSquashTarget = 0.72;
+    if (swipeHintText) swipeHintText.textContent = '⚡ Смахните пальцем по экрану, чтобы рассеять ураган!';
     if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
   }
   window.onSurfaceTapAction = onSurfaceTapAction;
@@ -463,7 +424,7 @@
   // ─── ЗАПУСК ДОМИКА И РАССЕИВАНИЕ УРАГАНА ───────────────
   function blowTornadoAndLaunchHouse(dirX = 1) {
     tornadoBlowAway = true;
-    tornadoBlowVel.set(dirX * 6.5, 3.5, 4.5);
+    tornadoBlowVel.set(dirX * 3.5, 2.5, 3.5);
 
     houseState = 'LAUNCHING';
     window.houseState = houseState;
@@ -471,21 +432,16 @@
     houseFlight.duration = 1400;
 
     const houseGroup = window.houseGroup;
-    const witchCottageGroup = window.witchCottageGroup;
-    if (houseGroup) {
-      houseGroup.getWorldPosition(houseFlight.startPos);
-      houseFlight.startRot.copy(houseGroup.rotation);
-      if (tScene && houseGroup.parent !== tScene) {
-        tScene.attach(houseGroup);
+    const dioramaGroup = window.dioramaGroup;
+    if (houseGroup && dioramaGroup) {
+      if (houseGroup.parent !== dioramaGroup) {
+        dioramaGroup.attach(houseGroup);
       }
+      houseFlight.startPos.copy(houseGroup.position);
+      houseFlight.startRot.copy(houseGroup.rotation);
     }
 
-    if (witchCottageGroup) {
-      witchCottageGroup.getWorldPosition(houseFlight.targetPos);
-      houseFlight.targetPos.y += 0.08;
-    } else {
-      houseFlight.targetPos.set(0.14, -0.65, -0.85);
-    }
+    houseFlight.targetPos.set(0.14, -0.61, -0.85);
   }
 
   function onHouseLanded() {
@@ -577,12 +533,10 @@
 
     // Привязка урагана к группе
     if (tornadoGroup) {
-      tornadoGroup.visible = (tornadoState !== 'WAITING_FOR_POSTER');
-      if (isTargetVisible && dioramaGroup) {
-        if (tornadoGroup.parent !== dioramaGroup) dioramaGroup.add(tornadoGroup);
-      } else if (tornadoGroup.parent !== tScene && tornadoState !== 'WAITING_FOR_POSTER') {
-        tScene.add(tornadoGroup);
+      if (dioramaGroup && tornadoGroup.parent !== dioramaGroup) {
+        dioramaGroup.add(tornadoGroup);
       }
+      tornadoGroup.visible = (tornadoState !== 'WAITING_FOR_POSTER') && isTargetVisible;
     }
 
     // 1. Появление и движение урагана
@@ -647,117 +601,45 @@
         if (banner) banner.textContent = '🌪️ Ураган перед вами! Смахните его в афишу!';
       }
     } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup) {
-      // 1. Дрейф и физика горизонтального перемещения
-      tornadoVel.x += Math.sin(elapsed * 1.5) * 0.003;
-      tornadoVel.z += Math.cos(elapsed * 1.2) * 0.003;
+      // 1. Ураган стабильно привязан к дороге перед афишей (TORNADO_ROOM_DEFAULT)
+      // Легкое естественное покачивание вихря на месте (всего 1.5 см)
+      const idleX = Math.sin(elapsed * 2.2) * 0.015;
+      const idleZ = Math.cos(elapsed * 1.8) * 0.012;
 
-      // Интеграция скорости в координаты на поверхности
-      tornadoSimPos.x += tornadoVel.x * dt;
-      tornadoSimPos.z += tornadoVel.z * dt;
+      tornadoSimPos.x = window.TORNADO_ROOM_DEFAULT.x + idleX;
+      tornadoSimPos.y = window.TORNADO_ROOM_DEFAULT.y;
+      tornadoSimPos.z = window.TORNADO_ROOM_DEFAULT.z + idleZ;
 
-      // Трение о поверхность (в воздухе трение меньше, на поверхности больше)
-      const friction = isTornadoAirborne ? 0.985 : 0.92;
-      tornadoVel.x *= Math.pow(friction, dt * 60);
-      tornadoVel.z *= Math.pow(friction, dt * 60);
+      // Строгое ограничение диапазона перед афишей в поле зрения камеры
+      tornadoSimPos.x = THREE.MathUtils.clamp(tornadoSimPos.x, -0.22, 0.22);
+      tornadoSimPos.y = window.TORNADO_ROOM_DEFAULT.y;
+      tornadoSimPos.z = THREE.MathUtils.clamp(tornadoSimPos.z, 0.10, 0.24);
 
-      // Ограничение диапазона в комнате
-      tornadoSimPos.x = THREE.MathUtils.clamp(tornadoSimPos.x, -2.5, 2.5);
-      tornadoSimPos.z = THREE.MathUtils.clamp(tornadoSimPos.z, 0.08, 3.2);
+      tornadoVel.set(0, 0, 0);
+      tornadoFallVelY = 0;
+      isTornadoAirborne = false;
 
-      // 2. Расчет высоты физической поверхности под текущей позицией
-      const targetSurface = getRoomSurfaceElevation(tornadoSimPos.x, tornadoSimPos.z);
-      const targetY = targetSurface.y;
-      currentSurfaceName = targetSurface.name;
+      // 2. Ураган всегда строго привязан к dioramaGroup перед афишей (никаких улетов в комнату)
+      if (dioramaGroup && tornadoGroup.parent !== dioramaGroup) {
+        dioramaGroup.add(tornadoGroup);
+      }
+      tornadoGroup.position.copy(tornadoSimPos);
+      tornadoGroup.visible = isTargetVisible;
 
-      if (tornadoSimPos.y > targetY + 0.015) {
-        // УРАГАН В ВОЗДУХЕ: свободное падение с края стола / ступени под силой тяжести!
-        isTornadoAirborne = true;
-        tornadoFallVelY += 4.8 * dt; // ускорение свободного падения g
-        tornadoSimPos.y -= tornadoFallVelY * dt;
-
-        // Наклон вихря вперед по ходу срыва с края
-        tornadoTiltTarget.x = THREE.MathUtils.lerp(tornadoTiltTarget.x, 0.40, dt * 8.0);
-        if (Math.abs(tornadoSimPos.x) > 0.58) {
-          tornadoTiltTarget.z = THREE.MathUtils.lerp(tornadoTiltTarget.z, (tornadoSimPos.x > 0 ? 0.38 : -0.38), dt * 8.0);
-        }
-
-        // Абразивный диск контакта ослабевает в полете над пропастью
-        if (floorContactMesh) {
-          floorContactMesh.material.opacity = THREE.MathUtils.lerp(floorContactMesh.material.opacity, 0.15, dt * 7.0);
-        }
-      } else if (tornadoSimPos.y < targetY - 0.015) {
-        // УРАГАН ПОДНИМАЕТСЯ ВВЕРХ (запрыгивает на ступень или стол восходящим потоком)
-        isTornadoAirborne = false;
-        tornadoSimPos.y += Math.min(3.2 * dt, targetY - tornadoSimPos.y);
-        tornadoTiltTarget.x = THREE.MathUtils.lerp(tornadoTiltTarget.x, -0.30, dt * 6.0);
-        tornadoFallVelY = 0;
-      } else {
-        // ПРИЗЕМЛИЛСЯ НА ПОВЕРХНОСТЬ
-        if (isTornadoAirborne && tornadoFallVelY > 0.42) {
-          // Удар о поверхность: сквош-деформация + взрыв пыли
-          window.tornadoSquashTarget = Math.max(0.48, 1.0 - tornadoFallVelY * 0.22);
-          if (window.triggerObstacleImpact) {
-            window.triggerObstacleImpact(lockedTornadoWorldPos, new THREE.Vector3(0, 1, 0));
-          }
-          if (window.sfx && window.sfx.snap) window.sfx.snap();
-          if (navigator.vibrate) navigator.vibrate([40, 25, 40]);
-
-          tornadoTiltTarget.x = 0;
-          tornadoTiltTarget.z = 0;
-          tornadoVel.multiplyScalar(0.45);
-        }
-        tornadoSimPos.y = targetY;
-        tornadoFallVelY = 0;
-        isTornadoAirborne = false;
-        if (floorContactMesh) {
-          floorContactMesh.material.opacity = THREE.MathUtils.lerp(floorContactMesh.material.opacity, 0.88, dt * 10.0);
-        }
+      if (floorContactMesh) {
+        floorContactMesh.visible = isTargetVisible;
+        floorContactMesh.position.set(0, 0.005, 0);
+        floorContactMesh.material.opacity = THREE.MathUtils.lerp(floorContactMesh.material.opacity, 0.88, dt * 10.0);
       }
 
-      // 3. Синхронизация с 3D-миром (камера / оптический трекер MindAR / гироскоп комнаты)
+      // 3. Информационный баннер
       const banner = document.getElementById('ar-warning-banner');
-
-      if (isTargetVisible && dioramaGroup) {
-        // АФИША В КАДРЕ: жесткая оптическая привязка к столу перед афишей с 6DOF трекингом
-        if (tornadoGroup.parent !== dioramaGroup) {
-          dioramaGroup.add(tornadoGroup);
-        }
-        tornadoGroup.position.copy(tornadoSimPos);
-        tornadoGroup.visible = true;
-
-        // Сохраняем мировую позицию урагана и углы гироскопа на момент видимости
-        dioramaGroup.updateMatrixWorld(true);
-        tornadoGroup.getWorldPosition(lockedTornadoWorldPos);
-        lastSeenGyroYaw = currentGyroYaw;
-        lastSeenGyroPitch = currentGyroPitch;
-        hasLockedPosterRoomAnchor = true;
-
+      if (isTargetVisible) {
         if (banner && banner.style.display !== 'none') banner.style.display = 'none';
       } else {
-        // АФИША ВНЕ КАДРА: ураган держится в комнате по гироскопу смартфона!
-        if (tornadoGroup.parent !== tScene) {
-          tScene.add(tornadoGroup);
-        }
-        tornadoGroup.visible = true;
-
-        if (hasLockedPosterRoomAnchor) {
-          let dYaw = currentGyroYaw - lastSeenGyroYaw;
-          while (dYaw > Math.PI) dYaw -= Math.PI * 2;
-          while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-          const dPitch = currentGyroPitch - lastSeenGyroPitch;
-
-          const gyroEuler = new THREE.Euler(-dPitch, -dYaw, 0, 'YXZ');
-          const targetRoomPos = lockedTornadoWorldPos.clone().applyEuler(gyroEuler);
-          if (targetRoomPos.z > -0.25) targetRoomPos.z = -0.25;
-
-          tornadoGroup.position.lerp(targetRoomPos, 0.22);
-        } else {
-          tornadoGroup.position.set(0, -0.4, -1.2);
-        }
-
         if (banner && banner.style.display === 'none') {
           banner.style.display = 'block';
-          banner.textContent = '⚠️ АФИША ВНЕ КАДРА! НАВЕДИТЕ НА АФИШУ ДЛЯ УДАРА!';
+          banner.textContent = '⚠️ НАВЕДИТЕ КАМЕРУ НА АФИШУ ДЛЯ УДАРА!';
         }
       }
     }
