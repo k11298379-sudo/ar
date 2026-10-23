@@ -235,7 +235,7 @@
       const stageRoot = document.getElementById('ar-stage') || document.body;
       const session = await navigator.xr.requestSession('immersive-ar', {
         requiredFeatures: ['hit-test'],
-        optionalFeatures: ['dom-overlay', 'light-estimation'],
+        optionalFeatures: ['local', 'local-floor', 'dom-overlay', 'light-estimation'],
         domOverlay: { root: stageRoot }
       });
 
@@ -249,10 +249,24 @@
       window.tornadoFloorPos = null;
 
       tRenderer.xr.enabled = true;
+      try {
+        tRenderer.xr.setReferenceSpaceType('local');
+      } catch (eRef) {
+        console.warn('[WebXR] setReferenceSpaceType error:', eRef);
+      }
       await tRenderer.xr.setSession(session);
 
-      // Пространства отсчёта
-      xrRefSpace = await session.requestReferenceSpace('local-floor');
+      // Пространства отсчёта с гарантированной поддержкой на всех устройствах
+      try {
+        xrRefSpace = await session.requestReferenceSpace('local');
+      } catch (e1) {
+        try {
+          xrRefSpace = await session.requestReferenceSpace('local-floor');
+        } catch (e2) {
+          xrRefSpace = await session.requestReferenceSpace('viewer');
+        }
+      }
+
       const viewerSpace = await session.requestReferenceSpace('viewer');
       xrHitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
