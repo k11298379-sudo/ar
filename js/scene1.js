@@ -42,6 +42,8 @@
 
   // Гироскоп и пространственная привязка в комнате
   let gyroActive = false;
+  let currentGyroAlpha = 0, currentGyroBeta = 0, currentGyroGamma = 0;
+  let lastSeenGyroAlpha = 0, lastSeenGyroBeta = 0;
   let currentGyroYaw = 0, currentGyroPitch = 0;
   let lastSeenGyroYaw = 0, lastSeenGyroPitch = 0;
   let hasLockedPosterRoomAnchor = false;
@@ -228,12 +230,12 @@
     if (e.alpha === null && e.beta === null) return;
     gyroActive = true;
 
-    if (e.alpha !== null) {
-      currentGyroYaw = e.alpha * (Math.PI / 180);
-    }
-    if (e.beta !== null) {
-      currentGyroPitch = (e.beta - 80) * (Math.PI / 180);
-    }
+    if (e.alpha !== null) currentGyroAlpha = e.alpha;
+    if (e.beta !== null)  currentGyroBeta  = e.beta;
+    if (e.gamma !== null) currentGyroGamma = e.gamma;
+
+    currentGyroYaw = currentGyroAlpha * (Math.PI / 180);
+    currentGyroPitch = (currentGyroBeta - 80) * (Math.PI / 180);
     window.camGyroPitch = currentGyroPitch;
     window.camGyroYaw   = currentGyroYaw;
   }
@@ -529,8 +531,31 @@
     if (dioramaGroup) {
       if (window.isWebXrActive) {
         dioramaGroup.visible = true;
+      } else if (isTargetActivelyTracked) {
+        lastSeenGyroAlpha = currentGyroAlpha;
+        lastSeenGyroBeta  = currentGyroBeta;
+        dioramaGroup.visible = true;
       } else {
-        dioramaGroup.visible = isTargetActivelyTracked;
+        if (tornadoState === 'WAITING_FOR_POSTER') {
+          dioramaGroup.visible = false;
+        } else if (window.lastTrackedPosterMatrix && gyroActive) {
+          // Инерциальный SLAM-трекинг по гироскопу:
+          // Ураган остаётся стоять в реальной комнате, даже если камера отведена от афиши!
+          const dAlpha = (currentGyroAlpha - lastSeenGyroAlpha) * (Math.PI / 180);
+          const dBeta  = (currentGyroBeta  - lastSeenGyroBeta)  * (Math.PI / 180);
+
+          const deltaRot = new THREE.Matrix4();
+          const eulerRot = new THREE.Euler(-dBeta, -dAlpha, 0, 'YXZ');
+          deltaRot.makeRotationFromEuler(eulerRot);
+
+          dioramaGroup.matrix.copy(deltaRot).multiply(window.lastTrackedPosterMatrix);
+          dioramaGroup.matrixWorld.copy(dioramaGroup.matrix);
+          dioramaGroup.matrixAutoUpdate = false;
+          dioramaGroup.matrixWorldNeedsUpdate = true;
+          dioramaGroup.visible = true;
+        } else {
+          dioramaGroup.visible = (tornadoState !== 'WAITING_FOR_POSTER');
+        }
       }
       if (window.posterGroup) window.posterGroup.visible = dioramaGroup.visible;
     }

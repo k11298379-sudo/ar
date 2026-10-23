@@ -1,12 +1,32 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <!-- Бесшовный переход в Google Chrome на Android -->
+  <script>
+    (function() {
+      try {
+        var ua = navigator.userAgent || '';
+        var isAndroid = /Android/i.test(ua);
+        var isMiuiOrCustom = /MiuiBrowser|XiaoMi|Mint|SamsungBrowser|YaBrowser|OPR|OPT|Telegram|VK/i.test(ua);
+        var isChrome = /Chrome\/[.0-9]+/i.test(ua) && !isMiuiOrCustom;
+        var tried = sessionStorage.getItem('chrome_intent_redirect');
+
+        if (isAndroid && !isChrome && !tried) {
+          sessionStorage.setItem('chrome_intent_redirect', '1');
+          var cleanUrl = location.href.replace(/^https?:\/\//, '');
+          var intent = 'intent://' + cleanUrl + '#Intent;scheme=https;package=com.android.chrome;end;';
+          location.replace(intent);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Волшебник Изумрудного Города — AR</title>
   
   <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=20261023_2345" />
+  <link rel="stylesheet" href="css/style.css?v=20261023_2355" />
 
   <!-- Core Libraries -->
   <script src="assets/three.min.js"></script>
@@ -184,13 +204,13 @@
   </div>
 
   <!-- Modular Scripts with Cache-Busting -->
-  <script src="js/state.js?v=20261023_2345"></script>
-  <script src="js/audio.js?v=20261023_2345"></script>
-  <script src="js/models.js?v=20261023_2345"></script>
-  <script src="js/tracking.js?v=20261023_2345"></script>
-  <script src="js/scene1.js?v=20261023_2345"></script>
-  <script src="js/webxr.js?v=20261023_2345"></script>
-  <script src="js/scene23.js?v=20261023_2345"></script>
-  <script src="js/main.js?v=20261023_2345"></script>
+  <script src="js/state.js?v=20261023_2355"></script>
+  <script src="js/audio.js?v=20261023_2355"></script>
+  <script src="js/models.js?v=20261023_2355"></script>
+  <script src="js/tracking.js?v=20261023_2355"></script>
+  <script src="js/scene1.js?v=20261023_2355"></script>
+  <script src="js/webxr.js?v=20261023_2355"></script>
+  <script src="js/scene23.js?v=20261023_2355"></script>
+  <script src="js/main.js?v=20261023_2355"></script>
 </body>
 </html>

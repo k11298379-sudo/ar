@@ -125,7 +125,8 @@
               const m = new THREE.Matrix4().fromArray(data.worldMatrix);
               if (postMatrices && postMatrices[data.targetIndex || 0]) {
                 m.multiply(postMatrices[data.targetIndex || 0]);
-              }
+              }
+              window.lastTrackedPosterMatrix = m.clone();
 
               if (dioramaGroup) {
                 dioramaGroup.matrix.copy(m);

@@ -38,7 +38,7 @@
       return;
     }
     console.log('🌟 [WebXR] Google ARCore Immersive-AR поддерживается!');
-    createWebXrPillButton();
+    // createWebXrPillButton();
   }
 
   // ─── 3. КНОПКА ARCore ────────────────────────────────────
