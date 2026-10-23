@@ -496,14 +496,14 @@
 
   // ─── ОСНОВНОЙ ЦИКЛ РЕНДЕРИНГА ──────────────────────────
   function threeRenderLoop(time) {
-    if (window.S.scene !== 1) return;
+    if (window.S.scene !== 1 || window.isWebXrActive) return;
     tAnimId = requestAnimationFrame(threeRenderLoop);
 
     const dt = Math.min(tClock ? tClock.getDelta() : 0.016, 0.05);
     const elapsed = tClock ? tClock.getElapsedTime() : (time * 0.001);
 
-    // Ориентация камеры: зафиксирована в центре системы координат AR
-    if (tCamera) {
+    // Ориентация камеры: зафиксирована в центре системы координат AR (если не WebXR)
+    if (tCamera && !window.isWebXrActive) {
       tCamera.position.set(0, 0, 0);
       tCamera.rotation.set(0, 0, 0);
     }
@@ -653,6 +653,32 @@
       }
     }
 
+    // 4. Обновление спецэффектов (вихрь, кольца, пыль, домик)
+    updateScene1VFX(dt, elapsed, time);
+
+    // 5. Неоновый шлейф
+    drawSwipeTrail();
+
+    // 6. Рендеринг сцены
+    tRenderer.render(tScene, tCamera);
+  }
+
+  // Общая функция визуальных эффектов (используется и в обычном режиме, и в WebXR ARCore)
+  function updateScene1VFX(dt, elapsed, time) {
+    const tornadoGroup = window.tornadoGroup;
+    const houseGroup = window.houseGroup;
+    const floorContactMesh = window.floorContactMesh;
+    const vortexParticles = window.vortexParticles;
+    const groundSwirlMesh = window.groundSwirlMesh;
+    const tornadoRings = window.tornadoRings || [];
+    const windRibbons = window.windRibbons || [];
+    const debrisList = window.debrisList || [];
+    const houseShutters = window.houseShutters || [];
+    const witchCottageGroup = window.witchCottageGroup;
+    const witchLegsGroup = window.witchLegsGroup;
+    const starSparklesPoints = window.starSparklesPoints;
+    const dustBurstPuffs = window.dustBurstPuffs || [];
+
     // Деформация вихря
     let sqCurr = window.tornadoSquashCurrent || 1.0;
     let sqTarg = window.tornadoSquashTarget || 1.0;
@@ -673,10 +699,15 @@
       if (groundSwirlMesh) groundSwirlMesh.material.opacity = tornadoOpacity * 0.45;
       if (vortexParticles) vortexParticles.material.opacity = tornadoOpacity * 0.55;
       if (floorContactMesh) floorContactMesh.material.opacity = tornadoOpacity * 0.85;
-    } else if (tornadoState === 'ROAMING' && tornadoGroup) {
+    } else if (tornadoState === 'ROAMING' && tornadoGroup && !window.isWebXrActive) {
       tornadoGroup.scale.set(window.TORNADO_BASE_SCALE * invSq, window.TORNADO_BASE_SCALE * sqCurr, window.TORNADO_BASE_SCALE * invSq);
       tornadoGroup.rotation.z = tornadoTiltCurrent.z;
       tornadoGroup.rotation.x = tornadoTiltCurrent.x;
+    } else if (tornadoGroup && window.isWebXrActive) {
+      tornadoGroup.scale.set(window.TORNADO_BASE_SCALE * invSq, window.TORNADO_BASE_SCALE * sqCurr, window.TORNADO_BASE_SCALE * invSq);
+      tornadoGroup.rotation.z = tornadoTiltCurrent.z;
+      tornadoGroup.rotation.x = tornadoTiltCurrent.x;
+      tornadoGroup.rotation.y += (4.8 * tornadoSpeedMult) * dt;
     }
 
     const spinRate = (4.8 * tornadoSpeedMult) * dt;
@@ -732,7 +763,7 @@
       d.rotation.y += d.userData.rotSpeed.y * dt;
     });
 
-    // 2. Анимация Домика Элли
+    // Анимация Домика Элли
     if (houseState === 'ORBITING' && houseGroup && tornadoGroup) {
       const hAngle = elapsed * 2.2 * tornadoSpeedMult;
       const orbitR = 0.65;
@@ -805,7 +836,7 @@
       }
     }
 
-    // 3. Обновление клубов пыли
+    // Обновление клубов пыли
     dustBurstPuffs.forEach(p => {
       if (!p.visible) return;
       p.userData.life += dt;
@@ -816,13 +847,8 @@
       p.scale.setScalar((1.0 - prog * 0.45) * 1.1);
       p.material.opacity = (1.0 - prog) * 0.85;
     });
-
-    // 4. Неоновый шлейф
-    drawSwipeTrail();
-
-    // 5. Рендеринг сцены
-    tRenderer.render(tScene, tCamera);
   }
+  window.updateScene1VFX = updateScene1VFX;
 
   function drawSwipeTrail() {
     const swipeTrailEl = document.getElementById('swipe-trail');
@@ -855,6 +881,7 @@
 
   // Экспорт
   window.initThreeScene1       = initThreeScene1;
+  window.threeRenderLoop       = threeRenderLoop;
   window.onThreeResize         = onThreeResize;
   window.stopThreeScene1       = stopThreeScene1;
   window.initGyroscope         = initGyroscope;
