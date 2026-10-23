@@ -38,7 +38,7 @@
       return;
     }
     console.log('🌟 [WebXR] Google ARCore Immersive-AR поддерживается!');
-    // createWebXrPillButton();
+    createWebXrPillButton();
   }
 
   // ─── 3. КНОПКА ARCore ────────────────────────────────────
@@ -47,10 +47,10 @@
 
     const btn = document.createElement('button');
     btn.id = 'btn-webxr-toggle';
-    btn.innerHTML = '🌟 <span>ARCore: Реальный пол</span>';
+    btn.innerHTML = '🌟 <span>Сканировать пол (Google ARCore)</span>';
     btn.style.cssText = `
       position: fixed;
-      bottom: 22px;
+      bottom: 76px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
@@ -114,6 +114,7 @@
       window.isWebXrActive = true;
       tornadoPlacedOnFloor = false;
       tornadoFloorPos      = null;
+      window.tornadoFloorPos = null;
 
       tRenderer.xr.enabled = true;
       await tRenderer.xr.setSession(session);
@@ -149,9 +150,23 @@
         btn.style.borderColor   = '#475569';
       }
 
-      // Скрываем подсказку (пусть ураган появится сам — это удивительнее)
+      // Подсказка для сканирования пола
       const hintText = document.getElementById('swipe-hint-text');
-      if (hintText) hintText.textContent = '';
+      const swipeHint = document.getElementById('swipe-hint');
+      if (swipeHint) swipeHint.style.display = 'flex';
+      if (hintText) hintText.textContent = '📱 Направьте камеру на пол для сканирования...';
+
+      setTimeout(() => {
+        if (isWebXrActive && !tornadoPlacedOnFloor && tornadoGroup) {
+          tornadoFloorPos = new THREE.Vector3(0, -0.75, -1.35);
+          window.tornadoFloorPos = tornadoFloorPos;
+          tornadoPlacedOnFloor = true;
+          tornadoGroup.position.copy(tornadoFloorPos);
+          tornadoGroup.visible = true;
+          if (hintText) hintText.textContent = '🌪️ Ураган на полу! Свайпайте экран для перемещения!';
+          if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
+        }
+      }, 3500);
 
       const prompt = document.getElementById('ar-target-prompt');
       if (prompt) prompt.style.display = 'none';
@@ -181,6 +196,7 @@
     xrHitTestSource      = null;
     tornadoPlacedOnFloor = false;
     tornadoFloorPos      = null;
+      window.tornadoFloorPos = null;
 
     const tRenderer = window.tRenderer;
     if (tRenderer) {
@@ -198,7 +214,7 @@
     // Кнопка — режим «Включить ARCore»
     const btn = document.getElementById('btn-webxr-toggle');
     if (btn) {
-      btn.innerHTML       = '🌟 <span>ARCore: Реальный пол</span>';
+      btn.innerHTML       = '🌟 <span>Сканировать пол (Google ARCore)</span>';
       btn.style.background  = 'linear-gradient(135deg, rgba(0,255,162,0.95), rgba(0,168,107,0.95))';
       btn.style.color       = '#012415';
       btn.style.borderColor = '#00ffa2';
@@ -247,6 +263,7 @@
             const mat = new THREE.Matrix4().fromArray(m);
             const pos = new THREE.Vector3().setFromMatrixPosition(mat);
             tornadoFloorPos      = pos;
+            window.tornadoFloorPos = tornadoFloorPos;
             tornadoPlacedOnFloor = true;
 
             if (tornadoGroup) {
@@ -255,6 +272,8 @@
             }
 
             if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
+            const banner = document.getElementById('swipe-hint-text');
+            if (banner) banner.textContent = '🌪️ Пол найден! Свайпайте экран для перемещения!';
             console.log('[WebXR] Ураган автоматически установлен на реальный пол:', pos);
           }
         }

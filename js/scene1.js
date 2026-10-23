@@ -395,6 +395,35 @@
     }
     if (houseState !== 'ORBITING' || tornadoState !== 'ROAMING') return;
 
+    if (window.isWebXrActive) {
+      // ══════════════════════════════════════════════════════
+      // РЕЖИМ GOOGLE ARCORE (НА РЕАЛЬНОМ ПОЛУ)
+      // Свайпы плавно перемещают ураган по реальному полу комнаты!
+      // ══════════════════════════════════════════════════════
+      const dirX = (dx >= 0 ? 1 : -1);
+      const stepX = (dx / window.innerWidth) * 1.5;
+      const stepZ = -(dy / window.innerHeight) * 1.5;
+
+      if (window.tornadoFloorPos) {
+        window.tornadoFloorPos.x += stepX;
+        window.tornadoFloorPos.z += stepZ;
+      }
+      tornadoTiltTarget.z = -dirX * 0.85;
+      tornadoTiltTarget.x = (dy >= 0 ? 0.40 : -0.40);
+
+      if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
+      if (window.triggerDustBurst && window.tornadoGroup) {
+        window.triggerDustBurst(window.tornadoGroup.position);
+      }
+      if (window.doFlash) window.doFlash('rgba(0, 255, 162, 0.35)', 150);
+
+      setTimeout(() => {
+        tornadoTiltTarget.z = 0;
+        tornadoTiltTarget.x = 0;
+      }, 750);
+      return;
+    }
+
     const nowMs = performance.now();
     const lastSeenTime = window.opticalLastSeenTime || 0;
     const isAimingAtPoster = (window.opticalTargetDetected === true) || (nowMs - lastSeenTime < 600);
