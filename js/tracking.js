@@ -108,6 +108,9 @@
         missTolerance: 6,
         onUpdate: (data) => {
           if (data.type === 'updateMatrix') {
+            // В WebXR режиме MindAR не должен двигать диораму или запускать сцену
+            if (window.isWebXrActive) return;
+
             const dioramaGroup = window.dioramaGroup;
             const posterGroup = window.posterGroup;
 

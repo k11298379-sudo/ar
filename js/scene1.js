@@ -359,20 +359,29 @@
     const gem2 = document.getElementById('gem-2');
 
     if (tornadoState === 'WAITING_FOR_POSTER') {
-      if (window.checkAimAtPoster && window.checkAimAtPoster()) {
-        if (window.triggerPosterEncounter) window.triggerPosterEncounter();
-      } else if (arWarningBanner) {
-        arWarningBanner.style.display = 'block';
-        clearTimeout(warningHideTimer);
-        warningHideTimer = setTimeout(() => {
-          if (arWarningBanner) arWarningBanner.style.display = 'none';
-        }, 2200);
+      // В WebXR режиме нет афиши — сразу переводим в ROAMING
+      if (window.isWebXrActive) {
+        tornadoState = 'ROAMING';
+        window.tornadoState = tornadoState;
+        houseState = 'ORBITING';
+        window.houseState = houseState;
+      } else {
+        if (window.checkAimAtPoster && window.checkAimAtPoster()) {
+          if (window.triggerPosterEncounter) window.triggerPosterEncounter();
+        } else if (arWarningBanner) {
+          arWarningBanner.style.display = 'block';
+          clearTimeout(warningHideTimer);
+          warningHideTimer = setTimeout(() => {
+            if (arWarningBanner) arWarningBanner.style.display = 'none';
+          }, 2200);
+        }
+        return;
       }
-      return;
+    }
     }
     if (houseState !== 'ORBITING' || tornadoState !== 'ROAMING') return;
 
-    const aimed = window.checkAimAtPoster ? window.checkAimAtPoster() : true;
+    const aimed = window.isWebXrActive ? true : (window.checkAimAtPoster ? window.checkAimAtPoster() : true);
 
     if (!aimed) {
       tornadoTiltTarget.z = -(dx / window.innerWidth) * 0.45;
