@@ -364,8 +364,8 @@
     }
 
     function getSiteUrl() {
-      // ВСЕГДА ведём строго на рабочий сайт AR на GitHub Pages!
-      return 'https://k11298379-sudo.github.io/ar/';
+      // Ведём строго на index.html для обхода кэшированных старых 301-редиректов браузера
+      return 'https://k11298379-sudo.github.io/ar/index.html';
     }
 
     renderQR(getSiteUrl());

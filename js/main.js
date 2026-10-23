@@ -147,7 +147,7 @@
     const modalQrContainer = document.getElementById('modal-qr-container');
     if (!modalLink) return;
 
-    const finalUrl = 'https://k11298379-sudo.github.io/ar/';
+    const finalUrl = 'https://k11298379-sudo.github.io/ar/index.html';
     modalLink.textContent = finalUrl;
     modalLink.href = finalUrl;
 
