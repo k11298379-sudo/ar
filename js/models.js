@@ -7,8 +7,8 @@
 
   // Константы позиционирования для MR
   const TORNADO_POSTER_POS   = new THREE.Vector3(0.06, -0.38, -0.80); // зарождается у домика Ведьмы в глубине портала
-  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.62, 0.16); // приземляется перед афишей на стол/клавиатуру (+16см к пользователю)
-  const TORNADO_BASE_SCALE   = 0.70; // масштаб вихря (~1.7м высота в реальном масштабе)
+  const TORNADO_ROOM_DEFAULT = new THREE.Vector3(0.0, -0.58, 0.42); // выходит наружу из портала на дорогу перед афишей (+42см к пользователю)
+  const TORNADO_BASE_SCALE   = 0.58; // масштаб вихря перед афишей (не заслоняет весь экран)
 
   window.TORNADO_POSTER_POS   = TORNADO_POSTER_POS;
   window.TORNADO_ROOM_DEFAULT = TORNADO_ROOM_DEFAULT;

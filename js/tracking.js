@@ -154,32 +154,14 @@
                 triggerPosterEncounter();
               }
             } else {
-              // Афиша потеряна из кадра — сглаживаем микро-потери кадра (буфер 350мс)
-              if (performance.now() - opticalLastSeenTime > 1500) {
+              // Афиша потеряна из кадра — буфер 400мс
+              if (performance.now() - opticalLastSeenTime > 400) {
                 opticalTargetDetected = false;
                 window.opticalTargetDetected = false;
 
-                // Скрываем диораму ТОЛЬКО если сцена еще не началась (ждем наведения на афишу)
                 if (window.tornadoState === 'WAITING_FOR_POSTER') {
-                  if (dioramaGroup) dioramaGroup.visible = false;
-                  if (posterGroup) posterGroup.visible = false;
-                }
-
-                const badge = document.getElementById('ar-badge');
-                if (badge) {
-                  badge.textContent = window.tornadoState !== 'WAITING_FOR_POSTER'
-                    ? '🌪️ Наведите камеру на афишу для удара!'
-                    : '🔍 Наведите на афишу целиком';
-                  badge.classList.remove('detected');
-                }
-
-                // Напоминаем навести камеру на афишу
-                if (window.tornadoState !== 'WAITING_FOR_POSTER') {
-                  const banner = document.getElementById('ar-warning-banner');
-                  if (banner) {
-                    banner.style.display = 'block';
-                    banner.textContent = '⚠️ НАВЕДИТЕ КАМЕРУ НА АФИШУ ДЛЯ УДАРА!';
-                  }
+                  const prompt = document.getElementById('ar-target-prompt');
+                  if (prompt) prompt.style.display = 'flex';
                 }
               }
             }
