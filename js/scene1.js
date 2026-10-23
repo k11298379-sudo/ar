@@ -32,6 +32,8 @@
   let camGyroPitch = 0, camGyroYaw = 0;
   const tornadoSimPos = new THREE.Vector3(0.0, -0.58, 0.42);
   const swipeKickOffset = new THREE.Vector3(0, 0, 0);
+  const tornadoFreeTarget = new THREE.Vector3(0.0, -0.75, -1.45);
+  const tornadoFreeCurrent = new THREE.Vector3(0.0, -0.75, -1.45);
   let tornadoFallVelY = 0.0;
   let currentSurfaceName = 'Стол';
   let isTornadoAirborne = false;
@@ -384,15 +386,51 @@
     }
     if (houseState !== 'ORBITING' || tornadoState !== 'ROAMING') return;
 
+    const nowMs = performance.now();
+    const lastSeenTime = window.opticalLastSeenTime || 0;
+    const isAimingAtPoster = (window.opticalTargetDetected === true) || (nowMs - lastSeenTime < 600);
+
+    // ────────────────────────────────────────────────────────
+    // РЕЖИМ 1: КАМЕРА ОТВЕДЕНА ОТ АФИШИ (ГУЛЯЕМ С УРАГАНОМ ПО КОМНАТЕ)
+    // Свайпы толкают ураган по полу комнаты, поворачивают и играют с ним!
+    // Игра НЕ заканчивается, домик остаётся кружиться!
+    // ────────────────────────────────────────────────────────
+    if (!isAimingAtPoster && !window.isWebXrActive) {
+      const dirX = (dx >= 0 ? 1 : -1);
+      tornadoFreeTarget.x = THREE.MathUtils.clamp(tornadoFreeTarget.x + dirX * 0.35, -1.2, 1.2);
+      tornadoFreeTarget.z = THREE.MathUtils.clamp(tornadoFreeTarget.z - (dy / window.innerHeight) * 0.5, -2.2, -0.9);
+
+      tornadoTiltTarget.z = -dirX * 0.85;
+      tornadoTiltTarget.x = (dy >= 0 ? 0.35 : -0.35);
+
+      if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
+      if (window.triggerDustBurst && window.tornadoGroup) {
+        window.triggerDustBurst(window.tornadoGroup.position);
+      }
+      if (window.doFlash) window.doFlash('rgba(56, 189, 248, 0.25)', 150);
+
+      if (swipeHint) swipeHint.style.display = 'flex';
+      if (swipeHintText) {
+        swipeHintText.textContent = '🌪️ Гуляем по комнате! Свайпайте для движения. Наведите на афишу для удара!';
+      }
+
+      setTimeout(() => {
+        tornadoTiltTarget.z = 0;
+        tornadoTiltTarget.x = 0;
+      }, 750);
+      return;
+    }
+
+    // ────────────────────────────────────────────────────────
+    // РЕЖИМ 2: КАМЕРА НАВЕДЕНА НА АФИШУ (АТАКА ДОМА ВЕДЬМЫ)
+    // ────────────────────────────────────────────────────────
     swipeCount++;
     const dir = dx >= 0 ? 1 : -1;
 
     if (swipeCount === 1) {
       if (gem1) { gem1.classList.add('active'); gem1.textContent = '⚡'; }
-      // Мощный наклон от удара
       tornadoTiltTarget.z = -dir * 0.90;
       tornadoTiltTarget.x = 0.50;
-      // Физический отброс урагана назад к афише
       swipeKickOffset.z = -0.22;
       swipeKickOffset.x = dir * 0.12;
       tornadoSpeedMult = 0.65;
@@ -645,47 +683,82 @@
         if (banner) banner.textContent = '🌪️ Ураган перед вами! Смахните его в афишу!';
       }
     } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup && !window.isWebXrActive) {
-      // 1. Ураган стабильно привязан к дороге перед афишей (TORNADO_ROOM_DEFAULT)
-      // Легкое естественное покачивание вихря на месте
-      const idleX = Math.sin(elapsed * 2.2) * 0.015;
-      const idleZ = Math.cos(elapsed * 1.8) * 0.012;
+      const nowMs = performance.now();
+      const lastSeenTime = window.opticalLastSeenTime || 0;
+      const isAimingAtPoster = (window.opticalTargetDetected === true) || (nowMs - lastSeenTime < 600);
 
-      // Физический отброс от свайпов
-      swipeKickOffset.lerp(new THREE.Vector3(0, 0, 0), dt * 3.2);
-
-      tornadoSimPos.x = window.TORNADO_ROOM_DEFAULT.x + idleX + swipeKickOffset.x;
-      tornadoSimPos.y = window.TORNADO_ROOM_DEFAULT.y;
-      tornadoSimPos.z = window.TORNADO_ROOM_DEFAULT.z + idleZ + swipeKickOffset.z;
-
-      // Ограничение диапазона перед афишей
-      tornadoSimPos.x = THREE.MathUtils.clamp(tornadoSimPos.x, -0.35, 0.35);
-      tornadoSimPos.y = window.TORNADO_ROOM_DEFAULT.y;
-      tornadoSimPos.z = THREE.MathUtils.clamp(tornadoSimPos.z, 0.15, 0.65);
-
-      tornadoVel.set(0, 0, 0);
-      tornadoFallVelY = 0;
-      isTornadoAirborne = false;
-
-      // 2. Ураган всегда строго привязан к dioramaGroup перед афишей
-      if (dioramaGroup && tornadoGroup.parent !== dioramaGroup) {
-        dioramaGroup.add(tornadoGroup);
-      }
-      tornadoGroup.position.copy(tornadoSimPos);
-      tornadoGroup.visible = dioramaGroup.visible;
-
-      if (floorContactMesh) {
-        floorContactMesh.visible = dioramaGroup.visible;
-        floorContactMesh.position.set(0, 0.005, 0);
-        floorContactMesh.material.opacity = THREE.MathUtils.lerp(floorContactMesh.material.opacity, 0.88, dt * 10.0);
-      }
-
-      // Подсказка для свайпа
       const swipeHint = document.getElementById('swipe-hint');
-      if (swipeHint && swipeCount === 0 && dioramaGroup.visible) {
-        swipeHint.style.display = 'flex';
-        const hintText = document.getElementById('swipe-hint-text');
-        if (hintText && !hintText.textContent) {
-          hintText.textContent = '🌪️ Смахните пальцем по экрану, чтобы рассеять ураган!';
+      const hintText = document.getElementById('swipe-hint-text');
+
+      if (isAimingAtPoster) {
+        // ── 1. КАМЕРА НАПРАВЛЕНА НА АФИШУ ──
+        if (dioramaGroup && tornadoGroup.parent !== dioramaGroup) {
+          dioramaGroup.add(tornadoGroup);
+        }
+        dioramaGroup.visible = true;
+        if (posterGroup) posterGroup.visible = true;
+
+        const idleX = Math.sin(elapsed * 2.2) * 0.015;
+        const idleZ = Math.cos(elapsed * 1.8) * 0.012;
+        swipeKickOffset.lerp(new THREE.Vector3(0, 0, 0), dt * 3.2);
+
+        tornadoSimPos.x = window.TORNADO_ROOM_DEFAULT.x + idleX + swipeKickOffset.x;
+        tornadoSimPos.y = window.TORNADO_ROOM_DEFAULT.y;
+        tornadoSimPos.z = window.TORNADO_ROOM_DEFAULT.z + idleZ + swipeKickOffset.z;
+
+        tornadoSimPos.x = THREE.MathUtils.clamp(tornadoSimPos.x, -0.35, 0.35);
+        tornadoSimPos.y = window.TORNADO_ROOM_DEFAULT.y;
+        tornadoSimPos.z = THREE.MathUtils.clamp(tornadoSimPos.z, 0.15, 0.65);
+
+        tornadoGroup.position.copy(tornadoSimPos);
+        tornadoGroup.visible = true;
+
+        if (floorContactMesh) {
+          floorContactMesh.visible = true;
+          floorContactMesh.position.set(0, 0.005, 0);
+          floorContactMesh.material.opacity = THREE.MathUtils.lerp(floorContactMesh.material.opacity, 0.88, dt * 10.0);
+        }
+
+        if (swipeHint && swipeCount === 0) {
+          swipeHint.style.display = 'flex';
+          if (hintText && !hintText.textContent) {
+            hintText.textContent = '🎯 Афиша найдена! Смахните ураган в афишу, чтобы победить!';
+          }
+        }
+      } else {
+        // ── 2. СВОБОДНАЯ ПРОГУЛКА С УРАГАНОМ ПО КОМНАТЕ ──
+        // Скрываем диораму портала афиши
+        if (dioramaGroup) dioramaGroup.visible = false;
+        if (posterGroup) posterGroup.visible = false;
+
+        const roomTornadoRoot = window.roomTornadoRoot || tScene;
+        if (tornadoGroup.parent !== roomTornadoRoot) {
+          roomTornadoRoot.add(tornadoGroup);
+          roomTornadoRoot.visible = true;
+        }
+
+        // Плавное парение на реальном полу комнаты
+        tornadoFreeCurrent.lerp(tornadoFreeTarget, dt * 4.0);
+        const idleBob = Math.sin(elapsed * 3.0) * 0.025;
+
+        tornadoGroup.position.set(
+          tornadoFreeCurrent.x,
+          -0.75 + idleBob,
+          tornadoFreeCurrent.z
+        );
+        tornadoGroup.visible = true;
+
+        if (floorContactMesh) {
+          floorContactMesh.visible = true;
+          floorContactMesh.position.set(0, 0.005, 0);
+          floorContactMesh.material.opacity = THREE.MathUtils.lerp(floorContactMesh.material.opacity, 0.88, dt * 10.0);
+        }
+
+        if (swipeHint && swipeCount === 0) {
+          swipeHint.style.display = 'flex';
+          if (hintText) {
+            hintText.textContent = '🌪️ Гуляем по комнате! Свайпайте для движения. Наведите на афишу для удара!';
+          }
         }
       }
     }
