@@ -416,21 +416,15 @@
               }
 
               if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
+              const banner = document.getElementById('swipe-hint-text');
+              if (banner) banner.textContent = '🌪️ Свайпайте для перемещения урагана';
               console.log('[WebXR] Поверхность найдена и привязана:', hitPos);
             } else {
-              // Поверхность изменилась (стол, стул, кровать, полка, ступени):
-              // Обновляем целевую высоту
-              targetSurfaceY = hitPos.y;
-            }
-
-            // Динамический статус поверхности на экране
-            const banner = document.getElementById('swipe-hint-text');
-            if (banner) {
-              const diffCm = Math.round((hitPos.y - (baseFloorY !== null ? baseFloorY : hitPos.y)) * 100);
-              if (diffCm >= 20) {
-                banner.textContent = `🛋️ Поверхность: мебель / стол (+${diffCm} см)`;
-              } else {
-                banner.textContent = '🌪️ Поверхность пола. Свайпайте для движения!';
+              // Адаптация высоты ТОЛЬКО если ураган был сдвинут свайпом на эту поверхность
+              // (проверяем, что точка поверхности находится прямо под ураганом)
+              const distToTornado = Math.hypot(hitPos.x - tornadoFloorPos.x, hitPos.z - tornadoFloorPos.z);
+              if (distToTornado < 0.75) {
+                targetSurfaceY = hitPos.y;
               }
             }
           }
