@@ -359,7 +359,6 @@
     const gem2 = document.getElementById('gem-2');
 
     if (tornadoState === 'WAITING_FOR_POSTER') {
-      // В WebXR режиме нет афиши — сразу переводим в ROAMING
       if (window.isWebXrActive) {
         tornadoState = 'ROAMING';
         window.tornadoState = tornadoState;
@@ -377,7 +376,6 @@
         }
         return;
       }
-    }
     }
     if (houseState !== 'ORBITING' || tornadoState !== 'ROAMING') return;
 

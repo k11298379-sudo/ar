@@ -231,7 +231,7 @@
 
   // Срабатывание встречи с афишей
   function triggerPosterEncounter() {
-    if (posterEncounterTriggered || !opticalTargetDetected) return;
+    if (posterEncounterTriggered || (!opticalTargetDetected && !window.opticalTargetDetected)) return;
 
     posterEncounterTriggered = true;
     window.posterEncounterTriggered = true;
