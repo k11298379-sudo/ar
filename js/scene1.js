@@ -32,8 +32,13 @@
   let camGyroPitch = 0, camGyroYaw = 0;
   const tornadoSimPos = new THREE.Vector3(0.0, -0.58, 0.42);
   const swipeKickOffset = new THREE.Vector3(0, 0, 0);
-  const tornadoFreeTarget = new THREE.Vector3(0.0, -0.75, -1.45);
-  const tornadoFreeCurrent = new THREE.Vector3(0.0, -0.75, -1.45);
+  // Позиция урагана на полу комнаты (двигается ТОЛЬКО по свайпам)
+  const tornadoRoomTarget  = new THREE.Vector3(0.0, -0.75, -1.45);
+  const tornadoRoomCurrent = new THREE.Vector3(0.0, -0.75, -1.45);
+  const gyroZeroQuat       = new THREE.Quaternion();
+  const currentGyroEuler   = new THREE.Euler(0, 0, 0, 'YXZ');
+  const currentGyroQuat    = new THREE.Quaternion();
+  const deltaGyroQuat      = new THREE.Quaternion();
   let tornadoFallVelY = 0.0;
   let currentSurfaceName = 'Стол';
   let isTornadoAirborne = false;
@@ -229,15 +234,19 @@
   }
 
   function onOrientationChange(e) {
-    if (e.alpha === null && e.beta === null) return;
+    if (e.alpha === null || e.beta === null) return;
     gyroActive = true;
 
-    if (e.alpha !== null) currentGyroAlpha = e.alpha;
-    if (e.beta !== null)  currentGyroBeta  = e.beta;
-    if (e.gamma !== null) currentGyroGamma = e.gamma;
+    const degToRad = Math.PI / 180;
+    const alpha = (e.alpha || 0) * degToRad;
+    const beta  = ((e.beta || 90) - 90) * degToRad;
+    const gamma = (e.gamma || 0) * degToRad;
 
-    currentGyroYaw = currentGyroAlpha * (Math.PI / 180);
-    currentGyroPitch = (currentGyroBeta - 80) * (Math.PI / 180);
+    currentGyroEuler.set(-beta, -alpha, gamma, 'YXZ');
+    currentGyroQuat.setFromEuler(currentGyroEuler);
+
+    currentGyroYaw = alpha;
+    currentGyroPitch = beta;
     window.camGyroPitch = currentGyroPitch;
     window.camGyroYaw   = currentGyroYaw;
   }
@@ -396,12 +405,22 @@
     // Игра НЕ заканчивается, домик остаётся кружиться!
     // ────────────────────────────────────────────────────────
     if (!isAimingAtPoster && !window.isWebXrActive) {
+      // ══════════════════════════════════════════════════════
+      // ДВИЖЕНИЕ УРАГАНА ПРОИСХОДИТ ТОЛЬКО ПО СВАЙПАМ!
+      // Сам ураган стоит на месте на полу, пока пользователь не свайпнет!
+      // ══════════════════════════════════════════════════════
       const dirX = (dx >= 0 ? 1 : -1);
-      tornadoFreeTarget.x = THREE.MathUtils.clamp(tornadoFreeTarget.x + dirX * 0.35, -1.2, 1.2);
-      tornadoFreeTarget.z = THREE.MathUtils.clamp(tornadoFreeTarget.z - (dy / window.innerHeight) * 0.5, -2.2, -0.9);
 
+      // Свайп толкает ураган по полу комнаты
+      const stepX = (dx / window.innerWidth) * 1.4;
+      const stepZ = -(dy / window.innerHeight) * 1.5;
+
+      tornadoRoomTarget.x = THREE.MathUtils.clamp(tornadoRoomTarget.x + stepX, -2.5, 2.5);
+      tornadoRoomTarget.z = THREE.MathUtils.clamp(tornadoRoomTarget.z + stepZ, -4.0, -0.6);
+
+      // Динамический наклон вихря в сторону удара
       tornadoTiltTarget.z = -dirX * 0.85;
-      tornadoTiltTarget.x = (dy >= 0 ? 0.35 : -0.35);
+      tornadoTiltTarget.x = (dy >= 0 ? 0.40 : -0.40);
 
       if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();
       if (window.triggerDustBurst && window.tornadoGroup) {
@@ -411,7 +430,7 @@
 
       if (swipeHint) swipeHint.style.display = 'flex';
       if (swipeHintText) {
-        swipeHintText.textContent = '🌪️ Гуляем по комнате! Свайпайте для движения. Наведите на афишу для удара!';
+        swipeHintText.textContent = '🌪️ Свайпы двигают ураган по полу! Наведите на афишу для удара!';
       }
 
       setTimeout(() => {
@@ -420,7 +439,6 @@
       }, 750);
       return;
     }
-
     // ────────────────────────────────────────────────────────
     // РЕЖИМ 2: КАМЕРА НАВЕДЕНА НА АФИШУ (АТАКА ДОМА ВЕДЬМЫ)
     // ────────────────────────────────────────────────────────
@@ -685,13 +703,18 @@
     } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup && !window.isWebXrActive) {
       const nowMs = performance.now();
       const lastSeenTime = window.opticalLastSeenTime || 0;
-      const isAimingAtPoster = (window.opticalTargetDetected === true) || (nowMs - lastSeenTime < 600);
+      const isAimingAtPoster = (window.opticalTargetDetected === true) || (nowMs - lastSeenTime < 450);
 
       const swipeHint = document.getElementById('swipe-hint');
       const hintText = document.getElementById('swipe-hint-text');
 
       if (isAimingAtPoster) {
         // ── 1. КАМЕРА НАПРАВЛЕНА НА АФИШУ ──
+        // Калибруем нулевой угол гироскопа по афише
+        gyroZeroQuat.copy(currentGyroQuat);
+        tCamera.quaternion.set(0, 0, 0, 1);
+        tCamera.position.set(0, 0, 0);
+
         if (dioramaGroup && tornadoGroup.parent !== dioramaGroup) {
           dioramaGroup.add(tornadoGroup);
         }
@@ -726,25 +749,31 @@
           }
         }
       } else {
-        // ── 2. СВОБОДНАЯ ПРОГУЛКА С УРАГАНОМ ПО КОМНАТЕ ──
-        // Скрываем диораму портала афиши
+        // ── 2. КАМЕРА ОТВЕДЕНА В СТОРОНУ (УРАГАН СТОИТ НА ПОЛУ В КОМНАТЕ) ──
+        // Скрываем диораму афиши
         if (dioramaGroup) dioramaGroup.visible = false;
         if (posterGroup) posterGroup.visible = false;
 
+        // Поворачиваем виртуальную камеру Three.js вместе с реальным телефоном!
+        if (gyroActive) {
+          deltaGyroQuat.copy(gyroZeroQuat).invert().premultiply(currentGyroQuat);
+          tCamera.quaternion.copy(deltaGyroQuat);
+        }
+
+        // Переносим ураган в мировую сцену комнаты
         const roomTornadoRoot = window.roomTornadoRoot || tScene;
         if (tornadoGroup.parent !== roomTornadoRoot) {
           roomTornadoRoot.add(tornadoGroup);
           roomTornadoRoot.visible = true;
         }
 
-        // Плавное парение на реальном полу комнаты
-        tornadoFreeCurrent.lerp(tornadoFreeTarget, dt * 4.0);
-        const idleBob = Math.sin(elapsed * 3.0) * 0.025;
+        // Ураган стоит на месте на полу и двигается ТОЛЬКО ПОСЛЕ СВАЙПА!
+        tornadoRoomCurrent.lerp(tornadoRoomTarget, dt * 5.0);
 
         tornadoGroup.position.set(
-          tornadoFreeCurrent.x,
-          -0.75 + idleBob,
-          tornadoFreeCurrent.z
+          tornadoRoomCurrent.x,
+          -0.75,
+          tornadoRoomCurrent.z
         );
         tornadoGroup.visible = true;
 
@@ -757,7 +786,7 @@
         if (swipeHint && swipeCount === 0) {
           swipeHint.style.display = 'flex';
           if (hintText) {
-            hintText.textContent = '🌪️ Гуляем по комнате! Свайпайте для движения. Наведите на афишу для удара!';
+            hintText.textContent = '🌪️ Свайпы двигают ураган по полу! Наведите на афишу для удара!';
           }
         }
       }
