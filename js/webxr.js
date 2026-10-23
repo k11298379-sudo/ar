@@ -124,11 +124,14 @@
       xrHitTestSource = await session.requestHitTestSource({ space: viewerSpace });
 
       // Переводим ураган в глобальную сцену (если был внутри диорамы)
+      // Сначала прячем — покажем только когда ARCore найдёт реальный пол
       const tornadoGroup = window.tornadoGroup;
-      if (tornadoGroup && tornadoGroup.parent !== tScene) {
-        tScene.attach(tornadoGroup);
+      if (tornadoGroup) {
+        if (tornadoGroup.parent !== tScene) {
+          tScene.attach(tornadoGroup);
+        }
         tornadoGroup.scale.setScalar(window.TORNADO_BASE_SCALE || 0.70);
-        tornadoGroup.visible = true;
+        tornadoGroup.visible = false; // скрыт до обнаружения пола
       }
 
       // Состояния для работы свайпов (как в режиме афиши)
@@ -248,6 +251,7 @@
 
             if (tornadoGroup) {
               tornadoGroup.position.copy(pos);
+              tornadoGroup.visible = true; // теперь показываем ураган
             }
 
             if (window.sfx && window.sfx.whoosh) window.sfx.whoosh();

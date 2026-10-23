@@ -540,8 +540,8 @@
     const starSparklesPoints = window.starSparklesPoints;
     const dustBurstPuffs = window.dustBurstPuffs || [];
 
-    // Привязка урагана к группе
-    if (tornadoGroup) {
+    // Привязка урагана к группе (только если WebXR не активен)
+    if (tornadoGroup && !window.isWebXrActive) {
       if (dioramaGroup && tornadoGroup.parent !== dioramaGroup) {
         dioramaGroup.add(tornadoGroup);
       }
@@ -559,7 +559,7 @@
       } else {
         window.aimHoldTime = Math.max(0, (window.aimHoldTime || 0) - dt);
       }
-    } else if (tornadoState === 'ERUPTING') {
+    } else if (tornadoState === 'ERUPTING' && !window.isWebXrActive) {
       const ep = Math.min(1.0, (time - eruptionStartTime) / ERUPTION_DURATION);
       const ease = 1 - Math.pow(1 - ep, 3);
 
@@ -609,7 +609,7 @@
         const banner = document.getElementById('swipe-hint-text');
         if (banner) banner.textContent = '🌪️ Ураган перед вами! Смахните его в афишу!';
       }
-    } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup) {
+    } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup && !window.isWebXrActive) {
       // 1. Ураган стабильно привязан к дороге перед афишей (TORNADO_ROOM_DEFAULT)
       // Легкое естественное покачивание вихря на месте (всего 1.5 см)
       const idleX = Math.sin(elapsed * 2.2) * 0.015;
