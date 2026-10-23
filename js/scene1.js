@@ -728,6 +728,14 @@
 
         const banner = document.getElementById('swipe-hint-text');
         if (banner) banner.textContent = '🌪️ Ураган перед вами! Смахните его в афишу!';
+
+        if (window.showOfficialArCorePrompt && !window.isWebXrActive) {
+          setTimeout(() => {
+            if (!window.isWebXrActive && window.showOfficialArCorePrompt) {
+              window.showOfficialArCorePrompt('poster');
+            }
+          }, 350);
+        }
       }
     } else if (tornadoState === 'ROAMING' && !tornadoBlowAway && tornadoGroup && !window.isWebXrActive) {
       const nowMs = performance.now();
